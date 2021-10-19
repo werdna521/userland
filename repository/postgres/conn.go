@@ -45,6 +45,8 @@ func NewPosgresConn(config Config) (*sql.DB, error) {
 }
 
 func getConnURL(config Config) string {
+	// here, we're using the container name postgres to link to the postgres URL
+	// (ordinarily should be hostname:port)
 	return fmt.Sprintf(
 		"postgres://%s:%s@postgres/%s",
 		config.Username,
