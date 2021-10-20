@@ -16,7 +16,7 @@ func main() {
 	postgresConfig := postgres.Config{
 		Username: os.Getenv("POSTGRES_USER"),
 		Password: os.Getenv("POSTGRES_PASSWORD"),
-		Database: os.Getenv("POSTGRES_USER"),
+		Database: os.Getenv("POSTGRES_DB"),
 	}
 
 	log.Info().Msg("get a new postgres connection")
