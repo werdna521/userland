@@ -4,10 +4,11 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/werdna521/userland/api/error/client"
+	e "github.com/werdna521/userland/api/error"
 	"github.com/werdna521/userland/api/response"
 	"github.com/werdna521/userland/api/validator"
 	"github.com/werdna521/userland/repository"
+	"github.com/werdna521/userland/service"
 )
 
 type registerRequest struct {
@@ -15,6 +16,10 @@ type registerRequest struct {
 	Email           string `json:"email"`
 	Password        string `json:"password"`
 	PasswordConfirm string `json:"password_confirm"`
+}
+
+type registerResponse struct {
+	Success bool `json:"success"`
 }
 
 func validateRegisterRequest(req *registerRequest) (map[string]string, bool) {
@@ -25,21 +30,36 @@ func validateRegisterRequest(req *registerRequest) (map[string]string, bool) {
 		fields["fullname"] = errMsg
 	}
 
-	return fields, true
+	errMsg, ok = validator.ValidateEmail(req.Email)
+	if !ok {
+		fields["email"] = errMsg
+	}
+
+	errMsg, ok = validator.ValidatePassword(req.Password)
+	if !ok {
+		fields["password"] = errMsg
+	}
+
+	errMsg, ok = validator.ValidatePasswordConfirm(req.Password, req.PasswordConfirm)
+	if !ok {
+		fields["password_confirm"] = errMsg
+	}
+
+	return fields, len(fields) == 0
 }
 
-func Register(ur repository.UserRepository) http.HandlerFunc {
+func Register(as service.AuthService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		req := &registerRequest{}
 		err := json.NewDecoder(r.Body).Decode(req)
 		if err != nil {
-			response.Error(w, client.NewBadRequestError("cannot decode request body"))
+			response.Error(w, e.NewBadRequestError("cannot decode request body"))
 			return
 		}
 
 		fields, ok := validateRegisterRequest(req)
 		if !ok {
-			response.Error(w, client.NewUnprocessableEntityError(fields))
+			response.Error(w, e.NewUnprocessableEntityError(fields))
 			return
 		}
 
@@ -50,14 +70,16 @@ func Register(ur repository.UserRepository) http.HandlerFunc {
 		}
 
 		ctx := r.Context()
-		err = ur.CreateUser(ctx, u)
+		err = as.Register(ctx, u)
 		if err != nil {
-			response.Error(w, err)
+			response.Error(w, err.(e.Error))
 			return
 		}
 
-		w.WriteHeader(http.StatusOK)
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(u)
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(&registerResponse{
+			Success: true,
+		})
 	}
 }
