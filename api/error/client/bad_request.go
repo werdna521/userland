@@ -6,12 +6,6 @@ type BadRequestError struct {
 	Msg string
 }
 
-func NewBadRequestError(msg string) BadRequestError {
-	return BadRequestError{
-		Msg: msg,
-	}
-}
-
 func (e BadRequestError) Error() string {
 	return e.Msg
 }
