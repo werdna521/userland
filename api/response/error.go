@@ -19,22 +19,13 @@ type unprocessableEntityResponse struct {
 }
 
 func respondWithError(w http.ResponseWriter, err e.Error, data interface{}) {
-	w.WriteHeader(err.StatusCode())
 	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(err.StatusCode())
 	json.NewEncoder(w).Encode(data)
 }
 
 func Error(w http.ResponseWriter, err e.Error) {
 	switch err := err.(type) {
-	case client.BadRequestError:
-		respondWithError(
-			w,
-			err,
-			baseErrorResponse{
-				Success: false,
-				Msg:     err.Error(),
-			},
-		)
 	case client.UnprocessableEntityError:
 		respondWithError(
 			w,
@@ -42,6 +33,15 @@ func Error(w http.ResponseWriter, err e.Error) {
 			unprocessableEntityResponse{
 				Success: false,
 				Fields:  err.Fields,
+			},
+		)
+	default:
+		respondWithError(
+			w,
+			err,
+			baseErrorResponse{
+				Success: false,
+				Msg:     err.Error(),
 			},
 		)
 	}
