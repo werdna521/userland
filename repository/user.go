@@ -15,5 +15,7 @@ type User struct {
 }
 
 type UserRepository interface {
+	PrepareStatements(context.Context) error
+	TearDownStatements()
 	CreateUser(ctx context.Context, user *User) error
 }

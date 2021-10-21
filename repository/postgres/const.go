@@ -1,10 +1,11 @@
 package postgres
 
 const (
-	userTableName            = "users"
-	userTableFullNameColName = "full_name"
-	userTableEmailColName    = "email"
-	userTablePasswordColName = "password"
+	userTableName                 = "users"
+	userTableFullNameColName      = "fullname"
+	userTableEmailColName         = "email"
+	userTablePasswordColName      = "password"
+	userTableEmailVerifiedColName = "email_verified"
 
 	idColName        = "id"
 	createdAtColName = "created_at"
