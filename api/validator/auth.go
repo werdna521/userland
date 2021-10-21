@@ -79,3 +79,16 @@ func ValidatePassword(password string) (string, bool) {
 
 	return "", true
 }
+
+func ValidatePasswordConfirm(password string, passwordConfirm string) (string, bool) {
+	errMsg, ok := validateStringRequired(passwordConfirm, "password_confirm")
+	if !ok {
+		return errMsg, false
+	}
+
+	if password != passwordConfirm {
+		return "passwords do not match", false
+	}
+
+	return "", true
+}
