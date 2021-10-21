@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"net/http"
@@ -10,16 +11,22 @@ import (
 	"github.com/werdna521/userland/api/handler/auth"
 	"github.com/werdna521/userland/repository"
 	"github.com/werdna521/userland/repository/postgres"
+	"github.com/werdna521/userland/service"
 )
 
 type Server struct {
 	Config
 	DataSource   *DataSource
 	repositories *repositories
+	services     *services
 }
 
 type repositories struct {
 	ur repository.UserRepository
+}
+
+type services struct {
+	as service.AuthService
 }
 
 type Config struct {
@@ -40,6 +47,10 @@ func NewServer(config Config, dataSource *DataSource) *Server {
 func (s *Server) Start() {
 	log.Info().Msg("initializing repositories")
 	s.initRepositories()
+	defer s.tearDownRepositories()
+
+	log.Info().Msg("initializing services")
+	s.initServices()
 
 	log.Info().Msg("initializing handlers")
 	h := s.initHandlers()
@@ -51,8 +62,22 @@ func (s *Server) Start() {
 
 func (s *Server) initRepositories() {
 	ur := postgres.NewUserRepository(s.DataSource.Postgres)
+	ur.PrepareStatements(context.Background())
+
 	s.repositories = &repositories{
 		ur: ur,
+	}
+}
+
+func (s *Server) tearDownRepositories() {
+	s.repositories.ur.TearDownStatements()
+}
+
+func (s *Server) initServices() {
+	as := service.NewBaseAuthService(s.repositories.ur)
+
+	s.services = &services{
+		as: as,
 	}
 }
 
@@ -61,7 +86,7 @@ func (s *Server) initHandlers() http.Handler {
 
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Route("/auth", func(r chi.Router) {
-			r.Post("/register", auth.Register(s.repositories.ur))
+			r.Post("/register", auth.Register(s.services.as))
 		})
 	})
 
