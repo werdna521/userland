@@ -59,7 +59,11 @@ func (s *Server) initRepositories() {
 func (s *Server) initHandlers() http.Handler {
 	r := chi.NewRouter()
 
-	r.Get("/", auth.HandleRegister(s.repositories.ur))
+	r.Route("/api/v1", func(r chi.Router) {
+		r.Route("/auth", func(r chi.Router) {
+			r.Post("/register", auth.Register(s.repositories.ur))
+		})
+	})
 
 	return r
 }

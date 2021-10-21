@@ -7,7 +7,7 @@ import (
 
 type User struct {
 	ID        int64
-	FullName  string
+	Fullname  string
 	Email     string
 	Password  string
 	CreatedAt time.Time

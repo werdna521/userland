@@ -4,24 +4,55 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/werdna521/userland/api/error/client"
+	"github.com/werdna521/userland/api/response"
+	"github.com/werdna521/userland/api/validator"
 	"github.com/werdna521/userland/repository"
 )
 
-func HandleRegister(ur repository.UserRepository) http.HandlerFunc {
+type registerRequest struct {
+	Fullname        string `json:"fullname"`
+	Email           string `json:"email"`
+	Password        string `json:"password"`
+	PasswordConfirm string `json:"password_confirm"`
+}
+
+func validateRegisterRequest(req *registerRequest) (map[string]string, bool) {
+	fields := map[string]string{}
+
+	errMsg, ok := validator.ValidateFullname(req.Fullname)
+	if !ok {
+		fields["fullname"] = errMsg
+	}
+
+	return fields, true
+}
+
+func Register(ur repository.UserRepository) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		ctx := r.Context()
-		u := &repository.User{
-			FullName: "Andrew Cen",
-			Email:    "andrew@me.com",
-			Password: "password",
+		req := &registerRequest{}
+		err := json.NewDecoder(r.Body).Decode(req)
+		if err != nil {
+			response.Error(w, client.NewBadRequestError("cannot decode request body"))
+			return
 		}
 
-		err := ur.CreateUser(ctx, u)
+		fields, ok := validateRegisterRequest(req)
+		if !ok {
+			response.Error(w, client.NewUnprocessableEntityError(fields))
+			return
+		}
+
+		u := &repository.User{
+			Fullname: req.Fullname,
+			Email:    req.Email,
+			Password: req.Password,
+		}
+
+		ctx := r.Context()
+		err = ur.CreateUser(ctx, u)
 		if err != nil {
-			json.NewEncoder(w).Encode(map[string]string{
-				"success": "false",
-				"error":   err.Error(),
-			})
+			response.Error(w, err)
 			return
 		}
 
