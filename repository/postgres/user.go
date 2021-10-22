@@ -15,7 +15,8 @@ type UserRepository struct {
 }
 
 type userQueryStatements struct {
-	createUserStmt *sql.Stmt
+	createUserStmt     *sql.Stmt
+	getUserByEmailStmt *sql.Stmt
 }
 
 func NewUserRepository(db *sql.DB) *UserRepository {
@@ -41,8 +42,22 @@ func (ur *UserRepository) PrepareStatements(ctx context.Context) error {
 		return err
 	}
 
+	query = fmt.Sprintf(
+		`SELECT * FROM %s
+		 WHERE %s = $1`,
+		userTableName,
+		userTableEmailColName,
+	)
+	log.Info().Msg("preparing get user by email statement")
+	getUserByEmailStmt, err := ur.db.PrepareContext(ctx, query)
+	if err != nil {
+		log.Error().Stack().Err(err).Msg("failed to prepare get user by email statement")
+		return err
+	}
+
 	ur.statements = &userQueryStatements{
-		createUserStmt: createUserStmt,
+		createUserStmt:     createUserStmt,
+		getUserByEmailStmt: getUserByEmailStmt,
 	}
 
 	return nil
@@ -53,16 +68,33 @@ func (ur *UserRepository) TearDownStatements() {
 }
 
 func (ur *UserRepository) CreateUser(ctx context.Context, u *repository.User) error {
-	var userID int64
+	log.Info().Msg("running statement to create user")
 	err := ur.statements.createUserStmt.
 		QueryRowContext(ctx, u.Fullname, u.Email, u.Password).
-		Scan(&userID)
+		Scan(&u.ID)
 	if err != nil {
 		log.Error().Stack().Err(err).Msg("failed to execute statement")
 		return err
 	}
 
-	u.ID = userID
-
 	return nil
+}
+
+func (ur *UserRepository) GetUserByEmail(ctx context.Context, email string) (*repository.User, error) {
+	u := &repository.User{}
+
+	log.Info().Msg("running statement to get user by email")
+	err := ur.statements.getUserByEmailStmt.
+		QueryRowContext(ctx, email).
+		Scan(&u.ID, &u.Fullname, &u.Email, &u.Password, &u.EmailVerified, &u.CreatedAt, &u.UpdatedAt)
+	if err == sql.ErrNoRows {
+		log.Error().Stack().Err(err).Msg("failed to find a user")
+		return nil, repository.NewNotFoundError()
+	}
+	if err != nil {
+		log.Error().Stack().Err(err).Msg("failed to execute statement")
+		return nil, err
+	}
+
+	return u, nil
 }

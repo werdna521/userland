@@ -16,6 +16,12 @@ func NewBadRequestError(msg string) client.BadRequestError {
 	}
 }
 
+func NewConflictError(msg string) client.ConflictError {
+	return client.ConflictError{
+		Msg: msg,
+	}
+}
+
 func NewUnprocessableEntityError(fields map[string]string) client.UnprocessableEntityError {
 	return client.UnprocessableEntityError{
 		Fields: fields,

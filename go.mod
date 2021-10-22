@@ -13,6 +13,6 @@ require (
 	github.com/jackc/pgtype v1.8.1 // indirect
 	github.com/jackc/pgx/v4 v4.13.0 // indirect
 	github.com/rs/zerolog v1.25.0 // indirect
-	golang.org/x/crypto v0.0.0-20210711020723-a769d52b0f97 // indirect
+	golang.org/x/crypto v0.0.0-20210921155107-089bfa567519 // indirect
 	golang.org/x/text v0.3.6 // indirect
 )
