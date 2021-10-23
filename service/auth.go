@@ -11,6 +11,7 @@ import (
 
 type AuthService interface {
 	Register(ctx context.Context, user *repository.User) e.Error
+	SendEmailVerification(ctx context.Context, email string) e.Error
 	VerifyEmail(ctx context.Context, email string, code string) e.Error
 }
 
@@ -56,11 +57,41 @@ func (bas *BaseAuthService) Register(ctx context.Context, u *repository.User) e.
 		return e.NewInternalServerError()
 	}
 
+	log.Info().Msg("starting send verification email service")
+	err = bas.SendEmailVerification(ctx, u.Email)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to send verification email")
+		return err.(e.Error)
+	}
+
+	return nil
+}
+
+func (bas *BaseAuthService) SendEmailVerification(
+	ctx context.Context,
+	email string,
+) e.Error {
+	log.Info().Msg("retrieving user from database")
+	u, err := bas.ur.GetUserByEmail(ctx, email)
+	if _, ok := err.(repository.NotFoundError); ok {
+		log.Error().Err(err).Msg("user not found")
+		return e.NewNotFoundError("user not found")
+	}
+	if err != nil {
+		log.Error().Err(err).Msg("failed to get user")
+		return e.NewInternalServerError()
+	}
+
+	if u.IsActive {
+		log.Error().Msg("user is already active")
+		return e.NewBadRequestError("user is already active")
+	}
+
 	log.Info().Msg("generating verification code")
 	verificationCode := security.GenerateRandomID()
 
 	log.Info().Msg("storing email verification code")
-	err = bas.evr.CreateVerification(ctx, u.Email, string(verificationCode))
+	err = bas.evr.CreateVerification(ctx, email, string(verificationCode))
 	if err != nil {
 		log.Error().Err(err).Msg("failed to store email verification code")
 		return e.NewInternalServerError()
@@ -84,7 +115,7 @@ func (bas *BaseAuthService) VerifyEmail(
 	storedCode, err := bas.evr.GetVerification(ctx, email)
 	if _, ok := err.(repository.NotFoundError); ok {
 		log.Error().Err(err).Msg("verification details not found")
-		return e.NewNotFoundError("account not found")
+		return e.NewNotFoundError("user not found")
 	}
 	if err != nil {
 		log.Error().Err(err).Msg("failed to get verification code")

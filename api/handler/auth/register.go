@@ -53,7 +53,7 @@ func Register(as service.AuthService) http.HandlerFunc {
 		req := &registerRequest{}
 		err := json.NewDecoder(r.Body).Decode(req)
 		if err != nil {
-			response.Error(w, e.NewBadRequestError("cannot decode request body"))
+			response.Error(w, e.NewBadRequestError("cannot decode request body")).JSON()
 			return
 		}
 

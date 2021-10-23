@@ -97,6 +97,7 @@ func (s *Server) initHandlers() http.Handler {
 
 			r.Route("/verification", func(r chi.Router) {
 				r.Get("/", auth.VerifyEmail(s.services.as))
+				r.Post("/", auth.SendVerification(s.services.as))
 			})
 		})
 	})

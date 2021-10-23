@@ -92,3 +92,45 @@ func ValidatePasswordConfirm(password string, passwordConfirm string) (string, b
 
 	return "", true
 }
+
+const (
+	verificationTypeFieldname = "type"
+	verificationTypeMaxChars  = 32
+)
+
+func ValidateVerificationType(verificationType string) (string, bool) {
+	errMsg, ok := validateStringRequired(verificationType, verificationTypeFieldname)
+	if !ok {
+		return errMsg, false
+	}
+
+	errMsg, ok = validateStringMaxChars(
+		verificationType,
+		verificationTypeMaxChars,
+		verificationTypeFieldname,
+	)
+	if !ok {
+		return errMsg, false
+	}
+
+	return "", true
+}
+
+const (
+	recipientFieldname = "recipient"
+	recipientMaxChars  = 128
+)
+
+func ValidateRecipient(recipient string) (string, bool) {
+	errMsg, ok := validateStringRequired(recipient, recipientFieldname)
+	if !ok {
+		return errMsg, false
+	}
+
+	errMsg, ok = validateStringMaxChars(recipient, recipientMaxChars, recipientFieldname)
+	if !ok {
+		return errMsg, false
+	}
+
+	return "", true
+}
