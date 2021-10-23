@@ -14,12 +14,17 @@ type AuthService interface {
 }
 
 type BaseAuthService struct {
-	ur repository.UserRepository
+	ur  repository.UserRepository
+	evr repository.EmailVerificationRepository
 }
 
-func NewBaseAuthService(ur repository.UserRepository) *BaseAuthService {
+func NewBaseAuthService(
+	ur repository.UserRepository,
+	evr repository.EmailVerificationRepository,
+) *BaseAuthService {
 	return &BaseAuthService{
-		ur: ur,
+		ur:  ur,
+		evr: evr,
 	}
 }
 
@@ -35,7 +40,6 @@ func (bas *BaseAuthService) Register(ctx context.Context, u *repository.User) e.
 		return e.NewInternalServerError()
 	}
 
-	// TODO: hash password
 	log.Info().Msg("hashing password")
 	hash, err := security.HashPassword(u.Password)
 	if err != nil {
@@ -52,6 +56,18 @@ func (bas *BaseAuthService) Register(ctx context.Context, u *repository.User) e.
 	}
 
 	// TODO: send email via SendVerification service handler
+
+	log.Info().Msg("generating verification code")
+	verificationCode := repository.VerificationCode(security.GenerateRandomID())
+
+	log.Info().Msg("storing email verification code")
+	err = bas.evr.CreateVerification(ctx, u.Email, verificationCode)
+	if err != nil {
+		log.Error().Err(err).Stack().Msg("failed to store email verification code")
+		return e.NewInternalServerError()
+	}
+
+	log.Debug().Msgf("verification code: %s", verificationCode)
 
 	return nil
 }

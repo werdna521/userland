@@ -7,10 +7,12 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/go-redis/redis/v8"
 	"github.com/rs/zerolog/log"
 	"github.com/werdna521/userland/api/handler/auth"
 	"github.com/werdna521/userland/repository"
 	"github.com/werdna521/userland/repository/postgres"
+	rds "github.com/werdna521/userland/repository/redis"
 	"github.com/werdna521/userland/service"
 )
 
@@ -22,7 +24,8 @@ type Server struct {
 }
 
 type repositories struct {
-	ur repository.UserRepository
+	ur  repository.UserRepository
+	evr repository.EmailVerificationRepository
 }
 
 type services struct {
@@ -35,6 +38,7 @@ type Config struct {
 
 type DataSource struct {
 	Postgres *sql.DB
+	Redis    *redis.Client
 }
 
 func NewServer(config Config, dataSource *DataSource) *Server {
@@ -64,8 +68,11 @@ func (s *Server) initRepositories() {
 	ur := postgres.NewUserRepository(s.DataSource.Postgres)
 	ur.PrepareStatements(context.Background())
 
+	evr := rds.NewVerificationRepository(s.DataSource.Redis)
+
 	s.repositories = &repositories{
-		ur: ur,
+		ur:  ur,
+		evr: evr,
 	}
 }
 
@@ -74,7 +81,7 @@ func (s *Server) tearDownRepositories() {
 }
 
 func (s *Server) initServices() {
-	as := service.NewBaseAuthService(s.repositories.ur)
+	as := service.NewBaseAuthService(s.repositories.ur, s.repositories.evr)
 
 	s.services = &services{
 		as: as,
