@@ -26,6 +26,7 @@ type Server struct {
 type repositories struct {
 	ur  repository.UserRepository
 	evr repository.EmailVerificationRepository
+	fpr repository.ForgotPasswordRepository
 }
 
 type services struct {
@@ -70,9 +71,12 @@ func (s *Server) initRepositories() {
 
 	evr := rds.NewVerificationRepository(s.DataSource.Redis)
 
+	fpr := rds.NewForgotPasswordRepository(s.DataSource.Redis)
+
 	s.repositories = &repositories{
 		ur:  ur,
 		evr: evr,
+		fpr: fpr,
 	}
 }
 
@@ -81,7 +85,11 @@ func (s *Server) tearDownRepositories() {
 }
 
 func (s *Server) initServices() {
-	as := service.NewBaseAuthService(s.repositories.ur, s.repositories.evr)
+	as := service.NewBaseAuthService(
+		s.repositories.ur,
+		s.repositories.evr,
+		s.repositories.fpr,
+	)
 
 	s.services = &services{
 		as: as,
@@ -98,6 +106,10 @@ func (s *Server) initHandlers() http.Handler {
 			r.Route("/verification", func(r chi.Router) {
 				r.Get("/", auth.VerifyEmail(s.services.as))
 				r.Post("/", auth.SendVerification(s.services.as))
+			})
+
+			r.Route("/password", func(r chi.Router) {
+				r.Post("/forgot", auth.ForgotPassword(s.services.as))
 			})
 		})
 	})

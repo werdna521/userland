@@ -9,12 +9,6 @@ import (
 	"github.com/werdna521/userland/repository"
 )
 
-const (
-	userKey         = "users"
-	verificationKey = "verification"
-	tokenKey        = "token"
-)
-
 type EmailVerificationRepository struct {
 	rdb *redis.Client
 }
@@ -25,38 +19,40 @@ func NewVerificationRepository(rdb *redis.Client) *EmailVerificationRepository {
 	}
 }
 
-func (vr *EmailVerificationRepository) getKey(email string) string {
+func (evr *EmailVerificationRepository) getKey(email string) string {
 	return fmt.Sprintf("%s:%s:%s:%s", userKey, email, verificationKey, tokenKey)
 }
 
-func (vr *EmailVerificationRepository) CreateVerificationToken(
+func (evr *EmailVerificationRepository) CreateVerificationToken(
 	ctx context.Context,
 	email string,
 	token string,
 ) error {
-	key := vr.getKey(email)
-	return vr.rdb.SetEX(ctx, key, token, 5*time.Minute).Err()
+	key := evr.getKey(email)
+	return evr.rdb.SetEX(ctx, key, token, 5*time.Minute).Err()
 }
 
-func (vr *EmailVerificationRepository) GetVerificationToken(
+func (evr *EmailVerificationRepository) GetVerificationToken(
 	ctx context.Context,
 	email string,
 ) (string, error) {
-	key := vr.getKey(email)
-	code, err := vr.rdb.Get(ctx, key).Result()
+	key := evr.getKey(email)
+
+	token, err := evr.rdb.Get(ctx, key).Result()
 	if err == redis.Nil {
 		return "", repository.NewNotFoundError()
 	}
 
-	return code, err
+	return token, err
 }
 
-func (vr *EmailVerificationRepository) DeleteVerificationToken(
+func (evr *EmailVerificationRepository) DeleteVerificationToken(
 	ctx context.Context,
 	email string,
 ) error {
-	key := vr.getKey(email)
-	err := vr.rdb.Del(ctx, key).Err()
+	key := evr.getKey(email)
+
+	err := evr.rdb.Del(ctx, key).Err()
 	if err == redis.Nil {
 		return repository.NewNotFoundError()
 	}

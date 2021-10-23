@@ -72,7 +72,7 @@ func SendVerification(as service.AuthService) http.HandlerFunc {
 
 type verifyEmailRequest struct {
 	Email string
-	Code  string
+	Token string
 }
 
 type verifyEmailResponse struct {
@@ -82,12 +82,12 @@ type verifyEmailResponse struct {
 func toVerifyEmailRequest(params url.Values) *verifyEmailRequest {
 	return &verifyEmailRequest{
 		Email: params.Get("email"),
-		Code:  params.Get("code"),
+		Token: params.Get("token"),
 	}
 }
 
 func validateVerifyEmailRequest(req *verifyEmailRequest) bool {
-	return req.Email != "" && req.Code != ""
+	return req.Email != "" && req.Token != ""
 }
 
 func VerifyEmail(as service.AuthService) http.HandlerFunc {
@@ -101,7 +101,7 @@ func VerifyEmail(as service.AuthService) http.HandlerFunc {
 		}
 
 		ctx := r.Context()
-		err := as.VerifyEmail(ctx, req.Email, req.Code)
+		err := as.VerifyEmail(ctx, req.Email, req.Token)
 		if err != nil {
 			response.Error(w, err).JSON()
 			return

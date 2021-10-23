@@ -13,20 +13,24 @@ type AuthService interface {
 	Register(ctx context.Context, user *repository.User) e.Error
 	SendEmailVerification(ctx context.Context, email string) e.Error
 	VerifyEmail(ctx context.Context, email string, code string) e.Error
+	ForgotPassword(ctx context.Context, email string) e.Error
 }
 
 type BaseAuthService struct {
 	ur  repository.UserRepository
 	evr repository.EmailVerificationRepository
+	pvr repository.ForgotPasswordRepository
 }
 
 func NewBaseAuthService(
 	ur repository.UserRepository,
 	evr repository.EmailVerificationRepository,
+	pvr repository.ForgotPasswordRepository,
 ) *BaseAuthService {
 	return &BaseAuthService{
 		ur:  ur,
 		evr: evr,
+		pvr: pvr,
 	}
 }
 
@@ -87,18 +91,18 @@ func (bas *BaseAuthService) SendEmailVerification(
 		return e.NewBadRequestError("user is already active")
 	}
 
-	log.Info().Msg("generating verification code")
-	verificationCode := security.GenerateRandomID()
+	log.Info().Msg("generating verification token")
+	verificationToken := security.GenerateRandomID()
 
-	log.Info().Msg("storing email verification code")
-	err = bas.evr.CreateVerificationToken(ctx, email, string(verificationCode))
+	log.Info().Msg("storing email verification token")
+	err = bas.evr.CreateVerificationToken(ctx, email, string(verificationToken))
 	if err != nil {
-		log.Error().Err(err).Msg("failed to store email verification code")
+		log.Error().Err(err).Msg("failed to store email verification token")
 		return e.NewInternalServerError()
 	}
 
-	// TODO: send email with verification code/link
-	log.Debug().Msgf("verification code: %s", verificationCode)
+	// TODO: send email with verification token/link
+	log.Debug().Msgf("verification token: %s", verificationToken)
 
 	return nil
 }
@@ -106,26 +110,26 @@ func (bas *BaseAuthService) SendEmailVerification(
 func (bas *BaseAuthService) VerifyEmail(
 	ctx context.Context,
 	email string,
-	verificationCode string,
+	verificationToken string,
 ) e.Error {
 	// TODO: to make it even safer, also check for the user's existence in the
 	// database. ideally, this case will be impossible, though.
 
-	log.Info().Msg("retrieving verification code from repository")
-	storedCode, err := bas.evr.GetVerificationToken(ctx, email)
+	log.Info().Msg("retrieving verification token from repository")
+	storedToken, err := bas.evr.GetVerificationToken(ctx, email)
 	if _, ok := err.(repository.NotFoundError); ok {
-		log.Error().Err(err).Msg("verification details not found")
+		log.Error().Err(err).Msg("verification token not found")
 		return e.NewNotFoundError("user not found")
 	}
 	if err != nil {
-		log.Error().Err(err).Msg("failed to get verification code")
+		log.Error().Err(err).Msg("failed to get verification token")
 		return e.NewInternalServerError()
 	}
 
-	log.Info().Msg("checking verification code")
-	if storedCode != verificationCode {
-		log.Error().Msg("invalid verification code")
-		return e.NewUnauthorizedError("invalid verification code")
+	log.Info().Msg("checking verification verification token")
+	if storedToken != verificationToken {
+		log.Error().Msg("invalid verification token")
+		return e.NewUnauthorizedError("invalid verification token")
 	}
 
 	log.Info().Msg("activating user account")
@@ -142,6 +146,40 @@ func (bas *BaseAuthService) VerifyEmail(
 		log.Error().Err(err).Msg("failed to remove verification details from redis")
 		return e.NewInternalServerError()
 	}
+
+	return nil
+}
+
+func (bas *BaseAuthService) ForgotPassword(ctx context.Context, email string) e.Error {
+	log.Info().Msg("retrieving user from the db")
+	u, err := bas.ur.GetUserByEmail(ctx, email)
+	if _, ok := err.(repository.NotFoundError); ok {
+		log.Error().Err(err).Msg("user not found")
+		return e.NewNotFoundError("user not found")
+	}
+	if err != nil {
+		log.Error().Err(err).Msg("failed to retrieve user")
+		return e.NewInternalServerError()
+	}
+
+	log.Info().Msg("checking user activation status")
+	if !u.IsActive {
+		log.Error().Msg("user is not active")
+		return e.NewBadRequestError("user is not active")
+	}
+
+	log.Info().Msg("generating forgot password token")
+	token := security.GenerateRandomID()
+
+	log.Info().Msg("storing forgot password token")
+	err = bas.pvr.CreateForgotPasswordToken(ctx, email, string(token))
+	if err != nil {
+		log.Error().Err(err).Msg("failed to store forgot password token")
+		return e.NewInternalServerError()
+	}
+
+	// TODO: send email with verification token/link
+	log.Debug().Msgf("forgot password token: %s", token)
 
 	return nil
 }
