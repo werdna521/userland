@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/rs/zerolog/log"
@@ -24,7 +23,6 @@ func main() {
 		Password: os.Getenv("REDIS_PASSWORD"),
 		DB:       0,
 	}
-	fmt.Println(redisConfig)
 
 	log.Info().Msg("get connection to postgres")
 	postgresConn, err := db.NewPosgresConn(postgresConfig)

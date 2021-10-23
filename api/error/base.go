@@ -16,6 +16,18 @@ func NewBadRequestError(msg string) client.BadRequestError {
 	}
 }
 
+func NewUnauthorizedError(msg string) client.UnauthorizedError {
+	return client.UnauthorizedError{
+		Msg: msg,
+	}
+}
+
+func NewNotFoundError(msg string) client.NotFoundError {
+	return client.NotFoundError{
+		Msg: msg,
+	}
+}
+
 func NewConflictError(msg string) client.ConflictError {
 	return client.ConflictError{
 		Msg: msg,

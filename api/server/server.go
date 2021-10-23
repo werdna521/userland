@@ -94,6 +94,10 @@ func (s *Server) initHandlers() http.Handler {
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Route("/auth", func(r chi.Router) {
 			r.Post("/register", auth.Register(s.services.as))
+
+			r.Route("/verification", func(r chi.Router) {
+				r.Get("/", auth.VerifyEmail(s.services.as))
+			})
 		})
 	})
 

@@ -31,8 +31,34 @@ func (vr *EmailVerificationRepository) getKey(email string) string {
 func (vr *EmailVerificationRepository) CreateVerification(
 	ctx context.Context,
 	email string,
-	verificationCode repository.VerificationCode,
+	verificationCode string,
 ) error {
 	key := vr.getKey(email)
 	return vr.rdb.SetEX(ctx, key, string(verificationCode), 60*time.Second).Err()
+}
+
+func (vr *EmailVerificationRepository) GetVerification(
+	ctx context.Context,
+	email string,
+) (string, error) {
+	key := vr.getKey(email)
+	code, err := vr.rdb.Get(ctx, key).Result()
+	if err == redis.Nil {
+		return "", repository.NewNotFoundError()
+	}
+
+	return code, err
+}
+
+func (vr *EmailVerificationRepository) DeleteVerification(
+	ctx context.Context,
+	email string,
+) error {
+	key := vr.getKey(email)
+	err := vr.rdb.Del(ctx, key).Err()
+	if err == redis.Nil {
+		return repository.NewNotFoundError()
+	}
+
+	return err
 }

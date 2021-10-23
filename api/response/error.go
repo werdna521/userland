@@ -1,7 +1,6 @@
 package response
 
 import (
-	"encoding/json"
 	"net/http"
 
 	e "github.com/werdna521/userland/api/error"
@@ -18,16 +17,18 @@ type unprocessableEntityResponse struct {
 	Fields  map[string]string `json:"fields"`
 }
 
-func respondWithError(w http.ResponseWriter, err e.Error, data interface{}) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(err.StatusCode())
-	json.NewEncoder(w).Encode(data)
+func respondWithError(w http.ResponseWriter, err e.Error, v interface{}) httpResponse {
+	return httpResponse{
+		statusCode: err.StatusCode(),
+		w:          w,
+		v:          v,
+	}
 }
 
-func Error(w http.ResponseWriter, err e.Error) {
+func Error(w http.ResponseWriter, err e.Error) httpResponse {
 	switch err := err.(type) {
 	case client.UnprocessableEntityError:
-		respondWithError(
+		return respondWithError(
 			w,
 			err,
 			unprocessableEntityResponse{
@@ -36,7 +37,7 @@ func Error(w http.ResponseWriter, err e.Error) {
 			},
 		)
 	default:
-		respondWithError(
+		return respondWithError(
 			w,
 			err,
 			baseErrorResponse{

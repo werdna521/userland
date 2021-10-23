@@ -59,7 +59,7 @@ func Register(as service.AuthService) http.HandlerFunc {
 
 		fields, ok := validateRegisterRequest(req)
 		if !ok {
-			response.Error(w, e.NewUnprocessableEntityError(fields))
+			response.Error(w, e.NewUnprocessableEntityError(fields)).JSON()
 			return
 		}
 
@@ -72,14 +72,12 @@ func Register(as service.AuthService) http.HandlerFunc {
 		ctx := r.Context()
 		err = as.Register(ctx, u)
 		if err != nil {
-			response.Error(w, err.(e.Error))
+			response.Error(w, err.(e.Error)).JSON()
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(&registerResponse{
+		response.OK(w, &registerResponse{
 			Success: true,
-		})
+		}).JSON()
 	}
 }

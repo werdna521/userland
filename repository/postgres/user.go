@@ -15,8 +15,9 @@ type UserRepository struct {
 }
 
 type userQueryStatements struct {
-	createUserStmt     *sql.Stmt
-	getUserByEmailStmt *sql.Stmt
+	createUserStmt                        *sql.Stmt
+	getUserByEmailStmt                    *sql.Stmt
+	updateUserActivationStatusByEmailStmt *sql.Stmt
 }
 
 func NewUserRepository(db *sql.DB) *UserRepository {
@@ -27,8 +28,8 @@ func NewUserRepository(db *sql.DB) *UserRepository {
 
 func (ur *UserRepository) PrepareStatements(ctx context.Context) error {
 	query := fmt.Sprintf(
-		`INSERT INTO %s(%s, %s, %s) 
-		 VALUES($1, $2, $3) 
+		`INSERT INTO %s(%s, %s, %s)
+		 VALUES($1, $2, $3)
 		 RETURNING id`,
 		userTableName,
 		userTableFullNameColName,
@@ -55,9 +56,25 @@ func (ur *UserRepository) PrepareStatements(ctx context.Context) error {
 		return err
 	}
 
+	query = fmt.Sprintf(
+		`UPDATE %s
+		 SET %s = $1
+		 WHERE %s = $2`,
+		userTableName,
+		userTableIsActiveColName,
+		userTableEmailColName,
+	)
+	log.Info().Msg("preparing update activation status by email statement")
+	updateUserActivationStatusByEmailStmt, err := ur.db.PrepareContext(ctx, query)
+	if err != nil {
+		log.Error().Stack().Err(err).Msg("failed to prepare update activation status by email statement")
+		return err
+	}
+
 	ur.statements = &userQueryStatements{
-		createUserStmt:     createUserStmt,
-		getUserByEmailStmt: getUserByEmailStmt,
+		createUserStmt:                        createUserStmt,
+		getUserByEmailStmt:                    getUserByEmailStmt,
+		updateUserActivationStatusByEmailStmt: updateUserActivationStatusByEmailStmt,
 	}
 
 	return nil
@@ -86,7 +103,7 @@ func (ur *UserRepository) GetUserByEmail(ctx context.Context, email string) (*re
 	log.Info().Msg("running statement to get user by email")
 	err := ur.statements.getUserByEmailStmt.
 		QueryRowContext(ctx, email).
-		Scan(&u.ID, &u.Fullname, &u.Email, &u.Password, &u.EmailVerified, &u.CreatedAt, &u.UpdatedAt)
+		Scan(&u.ID, &u.Fullname, &u.Email, &u.Password, &u.IsActive, &u.CreatedAt, &u.UpdatedAt)
 	if err == sql.ErrNoRows {
 		log.Error().Stack().Err(err).Msg("failed to find a user")
 		return nil, repository.NewNotFoundError()
@@ -97,4 +114,19 @@ func (ur *UserRepository) GetUserByEmail(ctx context.Context, email string) (*re
 	}
 
 	return u, nil
+}
+
+func (ur *UserRepository) UpdateUserActivationStatusByEmail(
+	ctx context.Context,
+	email string,
+	isActive bool,
+) error {
+	log.Info().Msg("running statement to update user activation status by email")
+	_, err := ur.statements.updateUserActivationStatusByEmailStmt.Exec(isActive, email)
+	if err != nil {
+		log.Error().Stack().Err(err).Msg("failed to execute statement")
+		return err
+	}
+
+	return nil
 }
