@@ -12,6 +12,7 @@ import (
 const (
 	userKey         = "users"
 	verificationKey = "verification"
+	tokenKey        = "token"
 )
 
 type EmailVerificationRepository struct {
@@ -25,19 +26,19 @@ func NewVerificationRepository(rdb *redis.Client) *EmailVerificationRepository {
 }
 
 func (vr *EmailVerificationRepository) getKey(email string) string {
-	return fmt.Sprintf("%s:%s:%s", userKey, email, verificationKey)
+	return fmt.Sprintf("%s:%s:%s:%s", userKey, email, verificationKey, tokenKey)
 }
 
-func (vr *EmailVerificationRepository) CreateVerification(
+func (vr *EmailVerificationRepository) CreateVerificationToken(
 	ctx context.Context,
 	email string,
-	verificationCode string,
+	token string,
 ) error {
 	key := vr.getKey(email)
-	return vr.rdb.SetEX(ctx, key, string(verificationCode), 60*time.Second).Err()
+	return vr.rdb.SetEX(ctx, key, token, 5*time.Minute).Err()
 }
 
-func (vr *EmailVerificationRepository) GetVerification(
+func (vr *EmailVerificationRepository) GetVerificationToken(
 	ctx context.Context,
 	email string,
 ) (string, error) {
@@ -50,7 +51,7 @@ func (vr *EmailVerificationRepository) GetVerification(
 	return code, err
 }
 
-func (vr *EmailVerificationRepository) DeleteVerification(
+func (vr *EmailVerificationRepository) DeleteVerificationToken(
 	ctx context.Context,
 	email string,
 ) error {

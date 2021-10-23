@@ -91,7 +91,7 @@ func (bas *BaseAuthService) SendEmailVerification(
 	verificationCode := security.GenerateRandomID()
 
 	log.Info().Msg("storing email verification code")
-	err = bas.evr.CreateVerification(ctx, email, string(verificationCode))
+	err = bas.evr.CreateVerificationToken(ctx, email, string(verificationCode))
 	if err != nil {
 		log.Error().Err(err).Msg("failed to store email verification code")
 		return e.NewInternalServerError()
@@ -112,7 +112,7 @@ func (bas *BaseAuthService) VerifyEmail(
 	// database. ideally, this case will be impossible, though.
 
 	log.Info().Msg("retrieving verification code from repository")
-	storedCode, err := bas.evr.GetVerification(ctx, email)
+	storedCode, err := bas.evr.GetVerificationToken(ctx, email)
 	if _, ok := err.(repository.NotFoundError); ok {
 		log.Error().Err(err).Msg("verification details not found")
 		return e.NewNotFoundError("user not found")
@@ -137,7 +137,7 @@ func (bas *BaseAuthService) VerifyEmail(
 
 	// still, remove the data from redis, even though it doesn't really matter tbh
 	log.Info().Msg("removing verification details from redis")
-	err = bas.evr.DeleteVerification(ctx, email)
+	err = bas.evr.DeleteVerificationToken(ctx, email)
 	if _, ok := err.(repository.NotFoundError); !ok && err != nil {
 		log.Error().Err(err).Msg("failed to remove verification details from redis")
 		return e.NewInternalServerError()
