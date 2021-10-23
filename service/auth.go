@@ -107,7 +107,7 @@ func (bas *BaseAuthService) VerifyEmail(
 	// still, remove the data from redis, even though it doesn't really matter tbh
 	log.Info().Msg("removing verification details from redis")
 	err = bas.evr.DeleteVerification(ctx, email)
-	if _, ok := err.(repository.NotFoundError); !ok {
+	if _, ok := err.(repository.NotFoundError); !ok && err != nil {
 		log.Error().Err(err).Msg("failed to remove verification details from redis")
 		return e.NewInternalServerError()
 	}
