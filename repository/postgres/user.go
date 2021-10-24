@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"time"
 
 	"github.com/rs/zerolog/log"
 	"github.com/werdna521/userland/repository"
@@ -49,7 +50,7 @@ type userStatements struct {
 	updatePasswordByEmailStmt             *sql.Stmt
 }
 
-func NewUserRepository(db *sql.DB) *BaseUserRepository {
+func NewBaseUserRepository(db *sql.DB) *BaseUserRepository {
 	return &BaseUserRepository{
 		db: db,
 	}
@@ -57,13 +58,10 @@ func NewUserRepository(db *sql.DB) *BaseUserRepository {
 
 func (r *BaseUserRepository) PrepareStatements(ctx context.Context) error {
 	query := fmt.Sprintf(
-		`INSERT INTO %s(%s, %s, %s)
-		 VALUES($1, $2, $3)
+		`INSERT INTO %s
+		 VALUES(DEFAULT, $1, $2, $3, $4, $5, $6)
 		 RETURNING id`,
 		userTableName,
-		userTableFullNameColName,
-		userTableEmailColName,
-		userTablePasswordColName,
 	)
 	log.Info().Msg("preparing create user statement")
 	createUserStmt, err := r.db.PrepareContext(ctx, query)
@@ -87,11 +85,14 @@ func (r *BaseUserRepository) PrepareStatements(ctx context.Context) error {
 
 	query = fmt.Sprintf(
 		`UPDATE %s
-		 SET %s = $1
-		 WHERE %s = $2
+		 SET 
+		   %s = $1,
+			 %s = $2
+		 WHERE %s = $3
 		 RETURNING *`,
 		userTableName,
 		userTableIsActiveColName,
+		userTableUpdatedAtColName,
 		userTableEmailColName,
 	)
 	log.Info().Msg("preparing update activation status by email statement")
@@ -103,11 +104,14 @@ func (r *BaseUserRepository) PrepareStatements(ctx context.Context) error {
 
 	query = fmt.Sprintf(
 		`UPDATE %s
-		 SET %s = $1
-		 WHERE %s = $2
+		 SET 
+		   %s = $1,
+			 %s = $2
+		 WHERE %s = $3
 		 RETURNING *`,
 		userTableName,
 		userTablePasswordColName,
+		userTableUpdatedAtColName,
 		userTableEmailColName,
 	)
 	log.Info().Msg("preparing update password by email statement")
@@ -137,9 +141,11 @@ func (r *BaseUserRepository) CreateUser(
 	ctx context.Context,
 	u *repository.User,
 ) (*repository.User, error) {
+	now := time.Now()
+
 	log.Info().Msg("running statement to create user")
 	err := r.statements.createUserStmt.
-		QueryRowContext(ctx, u.Fullname, u.Email, u.Password).
+		QueryRowContext(ctx, u.Fullname, u.Email, u.Password, u.IsActive, now, now).
 		Scan(&u.ID)
 
 	return u, err
@@ -169,10 +175,11 @@ func (r *BaseUserRepository) UpdateUserActivationStatusByEmail(
 	isActive bool,
 ) (*repository.User, error) {
 	u := &repository.User{}
+	now := time.Now()
 
 	log.Info().Msg("running statement to update user activation status by email")
 	err := r.statements.updateUserActivationStatusByEmailStmt.
-		QueryRowContext(ctx, isActive, email).
+		QueryRowContext(ctx, isActive, now, email).
 		Scan(&u.ID, &u.Fullname, &u.Email, &u.Password, &u.IsActive, &u.CreatedAt, &u.UpdatedAt)
 
 	return u, err
@@ -184,10 +191,11 @@ func (r *BaseUserRepository) UpdatePasswordByEmail(
 	password string,
 ) (*repository.User, error) {
 	u := &repository.User{}
+	now := time.Now()
 
 	log.Info().Msg("running statement to update password by email")
 	err := r.statements.updatePasswordByEmailStmt.
-		QueryRowContext(ctx, password, email).
+		QueryRowContext(ctx, password, now, email).
 		Scan(&u.ID, &u.Fullname, &u.Email, &u.Password, &u.IsActive, &u.CreatedAt, &u.UpdatedAt)
 
 	return u, err

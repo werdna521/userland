@@ -7,6 +7,7 @@ import (
 	e "github.com/werdna521/userland/api/error"
 	"github.com/werdna521/userland/repository"
 	"github.com/werdna521/userland/repository/postgres"
+	"github.com/werdna521/userland/repository/redis"
 	"github.com/werdna521/userland/security"
 )
 
@@ -21,13 +22,13 @@ type AuthService interface {
 type BaseAuthService struct {
 	ur  postgres.UserRepository
 	fpr postgres.ForgotPasswordRepository
-	tr  repository.TokenRepository
+	tr  redis.TokenRepository
 }
 
 func NewBaseAuthService(
 	ur postgres.UserRepository,
 	fpr postgres.ForgotPasswordRepository,
-	tr repository.TokenRepository,
+	tr redis.TokenRepository,
 ) *BaseAuthService {
 	return &BaseAuthService{
 		ur:  ur,
@@ -55,6 +56,8 @@ func (bas *BaseAuthService) Register(ctx context.Context, u *repository.User) e.
 		return e.NewInternalServerError()
 	}
 	u.Password = hash
+
+	u.IsActive = false
 
 	log.Info().Msg("creating and registering user")
 	u, err = bas.ur.CreateUser(ctx, u)
@@ -232,7 +235,7 @@ func (bas *BaseAuthService) ResetPassword(
 	}
 
 	log.Info().Msg("creating forgot password record")
-	err = bas.fpr.CreateForgotPasswordRecord(ctx, fp)
+	_, err = bas.fpr.CreateForgotPasswordRecord(ctx, fp)
 	if err != nil {
 		log.Error().Err(err).Msg("failed to create forgot password record")
 		return e.NewInternalServerError()

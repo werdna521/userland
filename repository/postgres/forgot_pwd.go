@@ -4,21 +4,23 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"time"
 
 	"github.com/rs/zerolog/log"
 	"github.com/werdna521/userland/repository"
 )
 
 const (
-	forgotPasswordTableName               = "forgot_passwords"
-	forgotPasswordTableUserIDColName      = "user_id"
-	forgotPasswordTableOldPasswordColName = "old_password"
+	forgotPasswordTableName = "forgot_passwords"
 )
 
 type ForgotPasswordRepository interface {
 	PrepareStatements(context.Context) error
 	TearDownStatements()
-	CreateForgotPasswordRecord(ctx context.Context, fp *repository.ForgotPassword) error
+	CreateForgotPasswordRecord(
+		ctx context.Context,
+		fp *repository.ForgotPassword,
+	) (*repository.ForgotPassword, error)
 }
 
 type BaseForgotPasswordRepository struct {
@@ -38,12 +40,10 @@ func NewBaseForgotPasswordRepository(db *sql.DB) *BaseForgotPasswordRepository {
 
 func (r *BaseForgotPasswordRepository) PrepareStatements(ctx context.Context) error {
 	query := fmt.Sprintf(
-		`INSERT INTO %s(%s, %s)
-		 VALUES($1, $2)
+		`INSERT INTO %s
+		 VALUES(DEFAULT, $1, $2, $3, $4)
 		 RETURNING id`,
 		forgotPasswordTableName,
-		forgotPasswordTableUserIDColName,
-		forgotPasswordTableOldPasswordColName,
 	)
 	log.Info().Msg("preparing create forgot password record statement")
 	createForgotPasswordRecordStmt, err := r.db.PrepareContext(ctx, query)
@@ -66,10 +66,13 @@ func (r *BaseForgotPasswordRepository) TearDownStatements() {
 func (r *BaseForgotPasswordRepository) CreateForgotPasswordRecord(
 	ctx context.Context,
 	fp *repository.ForgotPassword,
-) error {
+) (*repository.ForgotPassword, error) {
+	now := time.Now()
+
 	log.Info().Msg("running statement to create forgot password record")
 	err := r.statements.createForgotPasswordRecordStmt.
-		QueryRowContext(ctx, fp.UserID, fp.OldPassword).
+		QueryRowContext(ctx, fp.UserID, fp.OldPassword, now, now).
 		Scan(&fp.ID)
-	return err
+
+	return fp, err
 }

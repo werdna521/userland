@@ -10,7 +10,6 @@ import (
 	"github.com/go-redis/redis/v8"
 	"github.com/rs/zerolog/log"
 	"github.com/werdna521/userland/api/handler/auth"
-	"github.com/werdna521/userland/repository"
 	"github.com/werdna521/userland/repository/postgres"
 	rds "github.com/werdna521/userland/repository/redis"
 	"github.com/werdna521/userland/service"
@@ -26,7 +25,7 @@ type Server struct {
 type repositories struct {
 	ur  postgres.UserRepository
 	fpr postgres.ForgotPasswordRepository
-	tr  repository.TokenRepository
+	tr  rds.TokenRepository
 }
 
 type services struct {
@@ -66,13 +65,13 @@ func (s *Server) Start() {
 }
 
 func (s *Server) initRepositories() {
-	ur := postgres.NewUserRepository(s.DataSource.Postgres)
+	ur := postgres.NewBaseUserRepository(s.DataSource.Postgres)
 	ur.PrepareStatements(context.Background())
 
 	fpr := postgres.NewBaseForgotPasswordRepository(s.DataSource.Postgres)
 	fpr.PrepareStatements(context.Background())
 
-	tr := rds.NewTokenRepository(s.DataSource.Redis)
+	tr := rds.NewBaseTokenRepository(s.DataSource.Redis)
 
 	s.repositories = &repositories{
 		ur:  ur,

@@ -9,40 +9,56 @@ import (
 	"github.com/werdna521/userland/repository"
 )
 
-type TokenRepository struct {
+const (
+	userKey           = "user"
+	verificationKey   = "verification"
+	forgotPasswordKey = "forgotPassword"
+	tokenKey          = "token"
+)
+
+type TokenRepository interface {
+	CreateForgotPasswordToken(ctx context.Context, email string, token string) error
+	GetForgotPasswordToken(ctx context.Context, token string) (string, error)
+	DeleteForgotPasswordToken(ctx context.Context, token string) error
+	CreateEmailVerificationToken(ctx context.Context, email string, token string) error
+	GetEmailVerificationToken(ctx context.Context, email string) (string, error)
+	DeleteEmailVerificationToken(ctx context.Context, email string) error
+}
+
+type BaseTokenRepository struct {
 	rdb *redis.Client
 }
 
-func NewTokenRepository(rdb *redis.Client) *TokenRepository {
-	return &TokenRepository{
+func NewBaseTokenRepository(rdb *redis.Client) *BaseTokenRepository {
+	return &BaseTokenRepository{
 		rdb: rdb,
 	}
 }
 
-func (fpr *TokenRepository) getForgotPasswordTokenKey(token string) string {
+func (r *BaseTokenRepository) getForgotPasswordTokenKey(token string) string {
 	return fmt.Sprintf("%s:%s:%s", forgotPasswordKey, tokenKey, token)
 }
 
-func (evr *TokenRepository) getEmailVerificationTokenKey(email string) string {
+func (r *BaseTokenRepository) getEmailVerificationTokenKey(email string) string {
 	return fmt.Sprintf("%s:%s:%s:%s", userKey, email, verificationKey, tokenKey)
 }
 
-func (fpr *TokenRepository) CreateForgotPasswordToken(
+func (r *BaseTokenRepository) CreateForgotPasswordToken(
 	ctx context.Context,
 	email string,
 	token string,
 ) error {
-	key := fpr.getForgotPasswordTokenKey(token)
-	return fpr.rdb.SetEX(ctx, key, email, 5*time.Minute).Err()
+	key := r.getForgotPasswordTokenKey(token)
+	return r.rdb.SetEX(ctx, key, email, 5*time.Minute).Err()
 }
 
-func (fpr *TokenRepository) GetForgotPasswordToken(
+func (r *BaseTokenRepository) GetForgotPasswordToken(
 	ctx context.Context,
 	token string,
 ) (string, error) {
-	key := fpr.getForgotPasswordTokenKey(token)
+	key := r.getForgotPasswordTokenKey(token)
 
-	email, err := fpr.rdb.Get(ctx, key).Result()
+	email, err := r.rdb.Get(ctx, key).Result()
 	if err == redis.Nil {
 		return "", repository.NewNotFoundError()
 	}
@@ -50,13 +66,13 @@ func (fpr *TokenRepository) GetForgotPasswordToken(
 	return email, err
 }
 
-func (fpr *TokenRepository) DeleteForgotPasswordToken(
+func (r *BaseTokenRepository) DeleteForgotPasswordToken(
 	ctx context.Context,
 	email string,
 ) error {
-	key := fpr.getForgotPasswordTokenKey(email)
+	key := r.getForgotPasswordTokenKey(email)
 
-	err := fpr.rdb.Del(ctx, key).Err()
+	err := r.rdb.Del(ctx, key).Err()
 	if err == redis.Nil {
 		return repository.NewNotFoundError()
 	}
@@ -64,22 +80,22 @@ func (fpr *TokenRepository) DeleteForgotPasswordToken(
 	return err
 }
 
-func (evr *TokenRepository) CreateEmailVerificationToken(
+func (r *BaseTokenRepository) CreateEmailVerificationToken(
 	ctx context.Context,
 	email string,
 	token string,
 ) error {
-	key := evr.getEmailVerificationTokenKey(email)
-	return evr.rdb.SetEX(ctx, key, token, 5*time.Minute).Err()
+	key := r.getEmailVerificationTokenKey(email)
+	return r.rdb.SetEX(ctx, key, token, 5*time.Minute).Err()
 }
 
-func (evr *TokenRepository) GetEmailVerificationToken(
+func (r *BaseTokenRepository) GetEmailVerificationToken(
 	ctx context.Context,
 	email string,
 ) (string, error) {
-	key := evr.getEmailVerificationTokenKey(email)
+	key := r.getEmailVerificationTokenKey(email)
 
-	token, err := evr.rdb.Get(ctx, key).Result()
+	token, err := r.rdb.Get(ctx, key).Result()
 	if err == redis.Nil {
 		return "", repository.NewNotFoundError()
 	}
@@ -87,13 +103,13 @@ func (evr *TokenRepository) GetEmailVerificationToken(
 	return token, err
 }
 
-func (evr *TokenRepository) DeleteEmailVerificationToken(
+func (r *BaseTokenRepository) DeleteEmailVerificationToken(
 	ctx context.Context,
 	email string,
 ) error {
-	key := evr.getEmailVerificationTokenKey(email)
+	key := r.getEmailVerificationTokenKey(email)
 
-	err := evr.rdb.Del(ctx, key).Err()
+	err := r.rdb.Del(ctx, key).Err()
 	if err == redis.Nil {
 		return repository.NewNotFoundError()
 	}
