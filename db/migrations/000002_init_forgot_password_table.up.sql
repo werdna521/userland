@@ -1,0 +1,8 @@
+CREATE TABLE IF NOT EXISTS forgot_passwords (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL,
+  old_password TEXT NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  CONSTRAINT fk_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+)

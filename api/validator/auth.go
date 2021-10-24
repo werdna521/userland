@@ -134,3 +134,12 @@ func ValidateRecipient(recipient string) (string, bool) {
 
 	return "", true
 }
+
+func ValidateToken(token string) (string, bool) {
+	errMsg, ok := validateStringRequired(token, "token")
+	if !ok {
+		return errMsg, false
+	}
+
+	return "", true
+}

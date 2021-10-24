@@ -24,9 +24,9 @@ type Server struct {
 }
 
 type repositories struct {
-	ur  repository.UserRepository
-	evr repository.EmailVerificationRepository
-	fpr repository.ForgotPasswordRepository
+	ur  postgres.UserRepository
+	fpr postgres.ForgotPasswordRepository
+	tr  repository.TokenRepository
 }
 
 type services struct {
@@ -69,26 +69,28 @@ func (s *Server) initRepositories() {
 	ur := postgres.NewUserRepository(s.DataSource.Postgres)
 	ur.PrepareStatements(context.Background())
 
-	evr := rds.NewVerificationRepository(s.DataSource.Redis)
+	fpr := postgres.NewBaseForgotPasswordRepository(s.DataSource.Postgres)
+	fpr.PrepareStatements(context.Background())
 
-	fpr := rds.NewForgotPasswordRepository(s.DataSource.Redis)
+	tr := rds.NewTokenRepository(s.DataSource.Redis)
 
 	s.repositories = &repositories{
 		ur:  ur,
-		evr: evr,
 		fpr: fpr,
+		tr:  tr,
 	}
 }
 
 func (s *Server) tearDownRepositories() {
-	s.repositories.ur.TearDownStatements()
+	defer s.repositories.ur.TearDownStatements()
+	defer s.repositories.fpr.TearDownStatements()
 }
 
 func (s *Server) initServices() {
 	as := service.NewBaseAuthService(
 		s.repositories.ur,
-		s.repositories.evr,
 		s.repositories.fpr,
+		s.repositories.tr,
 	)
 
 	s.services = &services{
@@ -110,6 +112,7 @@ func (s *Server) initHandlers() http.Handler {
 
 			r.Route("/password", func(r chi.Router) {
 				r.Post("/forgot", auth.ForgotPassword(s.services.as))
+				r.Post("/reset", auth.ResetPassword(s.services.as))
 			})
 		})
 	})
