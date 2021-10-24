@@ -204,6 +204,8 @@ func (bas *BaseAuthService) ResetPassword(
 		return e.NewInternalServerError()
 	}
 
+	// TODO: check last 3 passwords
+
 	log.Info().Msg("hashing password")
 	hash, err := security.HashPassword(newPassword)
 	if err != nil {
