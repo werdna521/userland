@@ -9,20 +9,13 @@ import (
 	"github.com/werdna521/userland/repository"
 )
 
-const (
-	userKey           = "user"
-	verificationKey   = "verification"
-	forgotPasswordKey = "forgotPassword"
-	tokenKey          = "token"
-)
-
 type TokenRepository interface {
-	CreateForgotPasswordToken(ctx context.Context, email string, token string) error
+	CreateForgotPasswordToken(ctx context.Context, userID string, token string) error
 	GetForgotPasswordToken(ctx context.Context, token string) (string, error)
 	DeleteForgotPasswordToken(ctx context.Context, token string) error
-	CreateEmailVerificationToken(ctx context.Context, email string, token string) error
-	GetEmailVerificationToken(ctx context.Context, email string) (string, error)
-	DeleteEmailVerificationToken(ctx context.Context, email string) error
+	CreateEmailVerificationToken(ctx context.Context, userID string, token string) error
+	GetEmailVerificationToken(ctx context.Context, userID string) (string, error)
+	DeleteEmailVerificationToken(ctx context.Context, userID string) error
 }
 
 type BaseTokenRepository struct {
@@ -39,17 +32,17 @@ func (r *BaseTokenRepository) getForgotPasswordTokenKey(token string) string {
 	return fmt.Sprintf("%s:%s:%s", forgotPasswordKey, tokenKey, token)
 }
 
-func (r *BaseTokenRepository) getEmailVerificationTokenKey(email string) string {
-	return fmt.Sprintf("%s:%s:%s:%s", userKey, email, verificationKey, tokenKey)
+func (r *BaseTokenRepository) getEmailVerificationTokenKey(userID string) string {
+	return fmt.Sprintf("%s:%s:%s:%s", userKey, userID, verificationKey, tokenKey)
 }
 
 func (r *BaseTokenRepository) CreateForgotPasswordToken(
 	ctx context.Context,
-	email string,
+	userID string,
 	token string,
 ) error {
 	key := r.getForgotPasswordTokenKey(token)
-	return r.rdb.SetEX(ctx, key, email, 5*time.Minute).Err()
+	return r.rdb.SetEX(ctx, key, userID, 5*time.Minute).Err()
 }
 
 func (r *BaseTokenRepository) GetForgotPasswordToken(
@@ -68,9 +61,9 @@ func (r *BaseTokenRepository) GetForgotPasswordToken(
 
 func (r *BaseTokenRepository) DeleteForgotPasswordToken(
 	ctx context.Context,
-	email string,
+	token string,
 ) error {
-	key := r.getForgotPasswordTokenKey(email)
+	key := r.getForgotPasswordTokenKey(token)
 
 	err := r.rdb.Del(ctx, key).Err()
 	if err == redis.Nil {
@@ -82,18 +75,18 @@ func (r *BaseTokenRepository) DeleteForgotPasswordToken(
 
 func (r *BaseTokenRepository) CreateEmailVerificationToken(
 	ctx context.Context,
-	email string,
+	userID string,
 	token string,
 ) error {
-	key := r.getEmailVerificationTokenKey(email)
+	key := r.getEmailVerificationTokenKey(userID)
 	return r.rdb.SetEX(ctx, key, token, 5*time.Minute).Err()
 }
 
 func (r *BaseTokenRepository) GetEmailVerificationToken(
 	ctx context.Context,
-	email string,
+	userID string,
 ) (string, error) {
-	key := r.getEmailVerificationTokenKey(email)
+	key := r.getEmailVerificationTokenKey(userID)
 
 	token, err := r.rdb.Get(ctx, key).Result()
 	if err == redis.Nil {
@@ -105,9 +98,9 @@ func (r *BaseTokenRepository) GetEmailVerificationToken(
 
 func (r *BaseTokenRepository) DeleteEmailVerificationToken(
 	ctx context.Context,
-	email string,
+	userID string,
 ) error {
-	key := r.getEmailVerificationTokenKey(email)
+	key := r.getEmailVerificationTokenKey(userID)
 
 	err := r.rdb.Del(ctx, key).Err()
 	if err == redis.Nil {

@@ -22,6 +22,12 @@ func NewUnauthorizedError(msg string) client.UnauthorizedError {
 	}
 }
 
+func NewForbiddenError(msg string) client.ForbiddenError {
+	return client.ForbiddenError{
+		Msg: msg,
+	}
+}
+
 func NewNotFoundError(msg string) client.NotFoundError {
 	return client.NotFoundError{
 		Msg: msg,

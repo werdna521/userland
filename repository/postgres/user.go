@@ -6,12 +6,14 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/jackc/pgconn"
+	"github.com/jackc/pgerrcode"
 	"github.com/rs/zerolog/log"
 	"github.com/werdna521/userland/repository"
 )
 
 const (
-	userTableName             = "users"
+	userTableName             = `"user"`
 	userTableIDColName        = "id"
 	userTableFullNameColName  = "fullname"
 	userTableEmailColName     = "email"
@@ -25,15 +27,16 @@ type UserRepository interface {
 	PrepareStatements(context.Context) error
 	TearDownStatements()
 	CreateUser(ctx context.Context, user *repository.User) (*repository.User, error)
+	GetUserByID(ctx context.Context, userID string) (*repository.User, error)
 	GetUserByEmail(ctx context.Context, email string) (*repository.User, error)
-	UpdateUserActivationStatusByEmail(
+	UpdateUserActivationStatusByID(
 		ctx context.Context,
-		email string,
+		userID string,
 		isActive bool,
 	) (*repository.User, error)
-	UpdatePasswordByEmail(
+	UpdatePasswordByID(
 		ctx context.Context,
-		email string,
+		userID string,
 		password string,
 	) (*repository.User, error)
 }
@@ -44,10 +47,11 @@ type BaseUserRepository struct {
 }
 
 type userStatements struct {
-	createUserStmt                        *sql.Stmt
-	getUserByEmailStmt                    *sql.Stmt
-	updateUserActivationStatusByEmailStmt *sql.Stmt
-	updatePasswordByEmailStmt             *sql.Stmt
+	createUserStmt                     *sql.Stmt
+	getUserByIDStmt                    *sql.Stmt
+	getUserByEmailStmt                 *sql.Stmt
+	updateUserActivationStatusByIDStmt *sql.Stmt
+	updatePasswordByIDStmt             *sql.Stmt
 }
 
 func NewBaseUserRepository(db *sql.DB) *BaseUserRepository {
@@ -56,33 +60,61 @@ func NewBaseUserRepository(db *sql.DB) *BaseUserRepository {
 	}
 }
 
+func (r *BaseUserRepository) scanUser(u *repository.User, row *sql.Row) error {
+	return row.Scan(
+		&u.ID,
+		&u.Fullname,
+		&u.Email,
+		&u.Password,
+		&u.IsActive,
+		&u.CreatedAt,
+		&u.UpdatedAt,
+	)
+}
+
 func (r *BaseUserRepository) PrepareStatements(ctx context.Context) error {
+	log.Info().Msg("preparing create user statement")
 	query := fmt.Sprintf(
 		`INSERT INTO %s
 		 VALUES(DEFAULT, $1, $2, $3, $4, $5, $6)
 		 RETURNING id`,
 		userTableName,
 	)
-	log.Info().Msg("preparing create user statement")
 	createUserStmt, err := r.db.PrepareContext(ctx, query)
 	if err != nil {
 		log.Error().Err(err).Msg("failed to prepare create user statement")
 		return err
 	}
 
+	log.Info().Msg("preparing get user by ID statement")
 	query = fmt.Sprintf(
-		`SELECT * FROM %s
+		`SELECT *
+		 FROM %s
+		 WHERE %s = $1`,
+		userTableName,
+		userTableIDColName,
+	)
+	getUserByIDStmt, err := r.db.PrepareContext(ctx, query)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to prepare get user by ID statement")
+		return err
+	}
+
+	log.Info().Msg("preparing get user by email statement")
+	query = fmt.Sprintf(
+		`SELECT * 
+		 FROM %s
 		 WHERE %s = $1`,
 		userTableName,
 		userTableEmailColName,
 	)
-	log.Info().Msg("preparing get user by email statement")
 	getUserByEmailStmt, err := r.db.PrepareContext(ctx, query)
 	if err != nil {
 		log.Error().Err(err).Msg("failed to prepare get user by email statement")
 		return err
 	}
 
+	log.Info().Msg("preparing update activation status by email statement")
 	query = fmt.Sprintf(
 		`UPDATE %s
 		 SET 
@@ -93,15 +125,15 @@ func (r *BaseUserRepository) PrepareStatements(ctx context.Context) error {
 		userTableName,
 		userTableIsActiveColName,
 		userTableUpdatedAtColName,
-		userTableEmailColName,
+		userTableIDColName,
 	)
-	log.Info().Msg("preparing update activation status by email statement")
-	updateUserActivationStatusByEmailStmt, err := r.db.PrepareContext(ctx, query)
+	updateUserActivationStatusByIDStmt, err := r.db.PrepareContext(ctx, query)
 	if err != nil {
 		log.Error().Err(err).Msg("failed to prepare update activation status by email statement")
 		return err
 	}
 
+	log.Info().Msg("preparing update password by email statement")
 	query = fmt.Sprintf(
 		`UPDATE %s
 		 SET 
@@ -112,19 +144,19 @@ func (r *BaseUserRepository) PrepareStatements(ctx context.Context) error {
 		userTableName,
 		userTablePasswordColName,
 		userTableUpdatedAtColName,
-		userTableEmailColName,
+		userTableIDColName,
 	)
-	log.Info().Msg("preparing update password by email statement")
-	updatePasswordByEmailStmt, err := r.db.PrepareContext(ctx, query)
+	UpdatePasswordByIDStmt, err := r.db.PrepareContext(ctx, query)
 	if err != nil {
 		log.Error().Err(err).Msg("failed to prepare update password by email statement")
 	}
 
 	r.statements = &userStatements{
-		createUserStmt:                        createUserStmt,
-		getUserByEmailStmt:                    getUserByEmailStmt,
-		updateUserActivationStatusByEmailStmt: updateUserActivationStatusByEmailStmt,
-		updatePasswordByEmailStmt:             updatePasswordByEmailStmt,
+		createUserStmt:                     createUserStmt,
+		getUserByIDStmt:                    getUserByIDStmt,
+		getUserByEmailStmt:                 getUserByEmailStmt,
+		updateUserActivationStatusByIDStmt: updateUserActivationStatusByIDStmt,
+		updatePasswordByIDStmt:             UpdatePasswordByIDStmt,
 	}
 
 	return nil
@@ -133,8 +165,8 @@ func (r *BaseUserRepository) PrepareStatements(ctx context.Context) error {
 func (r *BaseUserRepository) TearDownStatements() {
 	defer r.statements.createUserStmt.Close()
 	defer r.statements.getUserByEmailStmt.Close()
-	defer r.statements.updateUserActivationStatusByEmailStmt.Close()
-	defer r.statements.updatePasswordByEmailStmt.Close()
+	defer r.statements.updateUserActivationStatusByIDStmt.Close()
+	defer r.statements.updatePasswordByIDStmt.Close()
 }
 
 func (r *BaseUserRepository) CreateUser(
@@ -148,6 +180,28 @@ func (r *BaseUserRepository) CreateUser(
 		QueryRowContext(ctx, u.Fullname, u.Email, u.Password, u.IsActive, now, now).
 		Scan(&u.ID)
 
+	if err, ok := err.(*pgconn.PgError); ok && err.Code == pgerrcode.UniqueViolation {
+		log.Error().Err(err).Msg("violated unique email constraint")
+		return nil, repository.NewUniqueViolationError()
+	}
+
+	return u, err
+}
+
+func (r *BaseUserRepository) GetUserByID(
+	ctx context.Context,
+	userID string,
+) (*repository.User, error) {
+	u := &repository.User{}
+
+	log.Info().Msg("running statement to get user by id")
+	row := r.statements.getUserByIDStmt.QueryRowContext(ctx, userID)
+	err := r.scanUser(u, row)
+	if err == sql.ErrNoRows {
+		log.Error().Err(err).Msg("failed to find user")
+		return nil, repository.NewNotFoundError()
+	}
+
 	return u, err
 }
 
@@ -158,9 +212,8 @@ func (r *BaseUserRepository) GetUserByEmail(
 	u := &repository.User{}
 
 	log.Info().Msg("running statement to get user by email")
-	err := r.statements.getUserByEmailStmt.
-		QueryRowContext(ctx, email).
-		Scan(&u.ID, &u.Fullname, &u.Email, &u.Password, &u.IsActive, &u.CreatedAt, &u.UpdatedAt)
+	row := r.statements.getUserByEmailStmt.QueryRowContext(ctx, email)
+	err := r.scanUser(u, row)
 	if err == sql.ErrNoRows {
 		log.Error().Err(err).Msg("failed to find a user")
 		return nil, repository.NewNotFoundError()
@@ -169,34 +222,32 @@ func (r *BaseUserRepository) GetUserByEmail(
 	return u, err
 }
 
-func (r *BaseUserRepository) UpdateUserActivationStatusByEmail(
+func (r *BaseUserRepository) UpdateUserActivationStatusByID(
 	ctx context.Context,
-	email string,
+	userID string,
 	isActive bool,
 ) (*repository.User, error) {
 	u := &repository.User{}
 	now := time.Now()
 
 	log.Info().Msg("running statement to update user activation status by email")
-	err := r.statements.updateUserActivationStatusByEmailStmt.
-		QueryRowContext(ctx, isActive, now, email).
-		Scan(&u.ID, &u.Fullname, &u.Email, &u.Password, &u.IsActive, &u.CreatedAt, &u.UpdatedAt)
+	row := r.statements.updateUserActivationStatusByIDStmt.QueryRowContext(ctx, isActive, now, userID)
+	err := r.scanUser(u, row)
 
 	return u, err
 }
 
-func (r *BaseUserRepository) UpdatePasswordByEmail(
+func (r *BaseUserRepository) UpdatePasswordByID(
 	ctx context.Context,
-	email string,
+	userID string,
 	password string,
 ) (*repository.User, error) {
 	u := &repository.User{}
 	now := time.Now()
 
 	log.Info().Msg("running statement to update password by email")
-	err := r.statements.updatePasswordByEmailStmt.
-		QueryRowContext(ctx, password, now, email).
-		Scan(&u.ID, &u.Fullname, &u.Email, &u.Password, &u.IsActive, &u.CreatedAt, &u.UpdatedAt)
+	row := r.statements.updatePasswordByIDStmt.QueryRowContext(ctx, password, now, userID)
+	err := r.scanUser(u, row)
 
 	return u, err
 }

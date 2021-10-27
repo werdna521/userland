@@ -54,7 +54,7 @@ const (
 	passwordFieldname = "password"
 )
 
-func ValidatePassword(password string) (string, bool) {
+func ValidatePasswordSimple(password string) (string, bool) {
 	errMsg, ok := validateStringRequired(password, passwordFieldname)
 	if !ok {
 		return errMsg, false
@@ -66,6 +66,15 @@ func ValidatePassword(password string) (string, bool) {
 	}
 
 	errMsg, ok = validateStringMaxChars(password, passwordMaxChars, passwordFieldname)
+	if !ok {
+		return errMsg, false
+	}
+
+	return "", true
+}
+
+func ValidatePassword(password string) (string, bool) {
+	errMsg, ok := ValidatePasswordSimple(password)
 	if !ok {
 		return errMsg, false
 	}

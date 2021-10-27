@@ -24,8 +24,9 @@ type Server struct {
 
 type repositories struct {
 	ur  postgres.UserRepository
-	fpr postgres.ForgotPasswordRepository
+	phr postgres.PasswordHistoryRepository
 	tr  rds.TokenRepository
+	sr  rds.SessionRepository
 }
 
 type services struct {
@@ -68,28 +69,32 @@ func (s *Server) initRepositories() {
 	ur := postgres.NewBaseUserRepository(s.DataSource.Postgres)
 	ur.PrepareStatements(context.Background())
 
-	fpr := postgres.NewBaseForgotPasswordRepository(s.DataSource.Postgres)
-	fpr.PrepareStatements(context.Background())
+	phr := postgres.NewBasePasswordHistoryRepository(s.DataSource.Postgres)
+	phr.PrepareStatements(context.Background())
 
 	tr := rds.NewBaseTokenRepository(s.DataSource.Redis)
 
+	sr := rds.NewBaseSessionRepository(s.DataSource.Redis)
+
 	s.repositories = &repositories{
 		ur:  ur,
-		fpr: fpr,
+		phr: phr,
 		tr:  tr,
+		sr:  sr,
 	}
 }
 
 func (s *Server) tearDownRepositories() {
 	defer s.repositories.ur.TearDownStatements()
-	defer s.repositories.fpr.TearDownStatements()
+	defer s.repositories.phr.TearDownStatements()
 }
 
 func (s *Server) initServices() {
 	as := service.NewBaseAuthService(
 		s.repositories.ur,
-		s.repositories.fpr,
+		s.repositories.phr,
 		s.repositories.tr,
+		s.repositories.sr,
 	)
 
 	s.services = &services{
@@ -103,6 +108,7 @@ func (s *Server) initHandlers() http.Handler {
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Route("/auth", func(r chi.Router) {
 			r.Post("/register", auth.Register(s.services.as))
+			r.Post("/login", auth.Login(s.services.as))
 
 			r.Route("/verification", func(r chi.Router) {
 				r.Get("/", auth.VerifyEmail(s.services.as))

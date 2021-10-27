@@ -1,15 +1,11 @@
 package repository
 
-import (
-	"time"
-)
+import "time"
 
-type User struct {
+type PasswordHistory struct {
 	ID        string
-	Fullname  string
-	Email     string
+	UserID    string
 	Password  string
-	IsActive  bool
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }
