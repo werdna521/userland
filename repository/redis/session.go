@@ -27,6 +27,7 @@ type SessionRepository interface {
 		rt *repository.RefreshToken,
 		expiresIn time.Duration,
 	) error
+	CheckRefreshToken(ctx context.Context, rt *repository.RefreshToken) (bool, error)
 }
 
 type BaseSessionRepository struct {
@@ -103,13 +104,22 @@ func (r *BaseSessionRepository) UpdateSessionExpiryTime(
 	key := r.getSessionKey(s.UserID, s.ID)
 	now := time.Now()
 
-	err := r.rdb.HSet(ctx, key, hSessionUpdatedAtKey, now).Err()
+	exp, err := r.rdb.TTL(ctx, key).Result()
+	if err != nil {
+		log.Error().Err(err).Msg("failed to get session expiry time")
+		return err
+	}
+
+	err = r.rdb.HSet(ctx, key, hSessionUpdatedAtKey, now).Err()
 	if err != nil {
 		log.Error().Err(err).Msg("failed to touch session")
 		return err
 	}
 
-	err = r.rdb.Expire(ctx, key, expiresIn).Err()
+	// we only update the session expiry time if it is less than the new expiry time
+	if exp.Seconds() < expiresIn.Seconds() {
+		err = r.rdb.Expire(ctx, key, expiresIn).Err()
+	}
 	return err
 }
 
@@ -127,6 +137,7 @@ func (r *BaseSessionRepository) CheckAccessToken(
 	at *repository.AccessToken,
 ) (bool, error) {
 	key := r.getAccessTokenKey(at)
+
 	jti, err := r.rdb.Get(ctx, key).Result()
 	if jti == "" {
 		return false, nil
@@ -145,4 +156,21 @@ func (r *BaseSessionRepository) CreateRefreshToken(
 ) error {
 	key := r.getRefreshTokenKey(rt)
 	return r.rdb.SetEX(ctx, key, rt.ID, expiresIn).Err()
+}
+
+func (r *BaseSessionRepository) CheckRefreshToken(
+	ctx context.Context,
+	rt *repository.RefreshToken,
+) (bool, error) {
+	key := r.getRefreshTokenKey(rt)
+
+	jti, err := r.rdb.Get(ctx, key).Result()
+	if jti == "" {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+
+	return jti == rt.ID, nil
 }

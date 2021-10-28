@@ -24,7 +24,7 @@ type AccessTokenClaims struct {
 }
 
 func CreateAccessToken(userID string, sessionID string) (*AccessToken, error) {
-	expiresAt := time.Now().Add(5 * time.Minute)
+	expiresAt := time.Now().Add(AccessTokenLife)
 	jti := string(security.GenerateRandomID())
 
 	log.Info().Msg("creating access token claims")

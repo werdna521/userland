@@ -3,10 +3,10 @@ package redis
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/go-redis/redis/v8"
 	"github.com/werdna521/userland/repository"
+	"github.com/werdna521/userland/security"
 )
 
 type TokenRepository interface {
@@ -42,7 +42,7 @@ func (r *BaseTokenRepository) CreateForgotPasswordToken(
 	token string,
 ) error {
 	key := r.getForgotPasswordTokenKey(token)
-	return r.rdb.SetEX(ctx, key, userID, 5*time.Minute).Err()
+	return r.rdb.SetEX(ctx, key, userID, security.TokenLife).Err()
 }
 
 func (r *BaseTokenRepository) GetForgotPasswordToken(
@@ -79,7 +79,7 @@ func (r *BaseTokenRepository) CreateEmailVerificationToken(
 	token string,
 ) error {
 	key := r.getEmailVerificationTokenKey(userID)
-	return r.rdb.SetEX(ctx, key, token, 5*time.Minute).Err()
+	return r.rdb.SetEX(ctx, key, token, security.TokenLife).Err()
 }
 
 func (r *BaseTokenRepository) GetEmailVerificationToken(

@@ -133,6 +133,11 @@ func (s *Server) initHandlers() http.Handler {
 					r.Use(middleware.ValidateAccessToken(s.repositories.sr))
 					r.Post("/refresh_token", session.GenerateRefreshToken(s.services.ss))
 				})
+
+				r.Group(func(r chi.Router) {
+					r.Use(middleware.ValidateRefreshToken(s.repositories.sr))
+					r.Post("/access_token", session.GenerateAccessToken(s.services.ss))
+				})
 			})
 		})
 	})

@@ -24,8 +24,7 @@ type RefreshTokenClaims struct {
 }
 
 func CreateRefreshToken(userID string, sessionID string) (*RefreshToken, error) {
-	// TODO: make expiration longer, current duration is just for debugging purposes
-	expiresAt := time.Now().Add(10 * time.Minute)
+	expiresAt := time.Now().Add(RefreshTokenLife)
 	jti := string(security.GenerateRandomID())
 
 	claims := RefreshTokenClaims{
@@ -53,4 +52,26 @@ func CreateRefreshToken(userID string, sessionID string) (*RefreshToken, error) 
 		SessionID: sessionID,
 	}
 	return rt, nil
+}
+
+func ParseRefreshToken(jwtString string) (*RefreshToken, bool, error) {
+	claims := &RefreshTokenClaims{}
+
+	// parse the token
+	t, err := parseJWTToken(jwtString, claims)
+	if err != nil {
+		log.Error().Err(err).Msg("error parsing access token")
+		return nil, false, err
+	}
+
+	rt := &RefreshToken{
+		Value:     jwtString,
+		Type:      "Bearer",
+		ExpiredAt: time.Unix(claims.ExpiresAt, 0),
+		JTI:       claims.Id,
+		UserID:    claims.UserID,
+		SessionID: claims.SessionID,
+	}
+
+	return rt, t.Valid, nil
 }

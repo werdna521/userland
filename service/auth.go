@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"time"
 
 	"github.com/rs/zerolog/log"
 	e "github.com/werdna521/userland/api/error"
@@ -205,7 +204,7 @@ func (s *BaseAuthService) Login(
 		UserID:    at.UserID,
 		SessionID: at.SessionID,
 	}
-	err = s.sr.CreateAccessToken(ctx, token, 5*time.Minute)
+	err = s.sr.CreateAccessToken(ctx, token, jwt.AccessTokenLife)
 	if err != nil {
 		log.Error().Err(err).Msg("failed to store access token")
 		return nil, e.NewInternalServerError()
@@ -217,7 +216,7 @@ func (s *BaseAuthService) Login(
 		Client: clientID,
 		UserID: at.UserID,
 	}
-	err = s.sr.CreateSession(ctx, session, 5*time.Minute)
+	err = s.sr.CreateSession(ctx, session, jwt.AccessTokenLife)
 	if err != nil {
 		log.Error().Err(err).Msg("failed to store session in redis")
 		return nil, e.NewInternalServerError()
