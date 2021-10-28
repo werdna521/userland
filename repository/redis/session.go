@@ -15,6 +15,7 @@ type SessionRepository interface {
 		at *repository.AccessToken,
 		expiresIn time.Duration,
 	) error
+	CheckAccessToken(ctx context.Context, at *repository.AccessToken) (bool, error)
 	CreateRefreshToken(ctx context.Context,
 		rt *repository.RefreshToken,
 		expiresIn time.Duration,
@@ -86,6 +87,22 @@ func (r *BaseSessionRepository) CreateAccessToken(
 ) error {
 	key := r.getAccessTokenKey(at)
 	return r.rdb.SetEX(ctx, key, at.ID, expiresIn).Err()
+}
+
+func (r *BaseSessionRepository) CheckAccessToken(
+	ctx context.Context,
+	at *repository.AccessToken,
+) (bool, error) {
+	key := r.getAccessTokenKey(at)
+	jti, err := r.rdb.Get(ctx, key).Result()
+	if jti == "" {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+
+	return jti == at.ID, nil
 }
 
 func (r *BaseSessionRepository) CreateRefreshToken(

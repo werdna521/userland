@@ -54,3 +54,25 @@ func CreateAccessToken(userID string, sessionID string) (*AccessToken, error) {
 	}
 	return at, nil
 }
+
+func ParseAccessToken(jwtString string) (*AccessToken, bool, error) {
+	claims := &AccessTokenClaims{}
+
+	// parse the token
+	t, err := parseJWTToken(jwtString, claims)
+	if err != nil {
+		log.Error().Err(err).Msg("error parsing access token")
+		return nil, false, err
+	}
+
+	at := &AccessToken{
+		Value:     jwtString,
+		Type:      "Bearer",
+		ExpiredAt: time.Unix(claims.ExpiresAt, 0),
+		JTI:       claims.Id,
+		UserID:    claims.UserID,
+		SessionID: claims.SessionID,
+	}
+
+	return at, t.Valid, nil
+}
