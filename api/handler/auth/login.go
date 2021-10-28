@@ -18,9 +18,9 @@ type loginRequest struct {
 }
 
 type loginResponse struct {
-	Success          bool `json:"success"`
-	RequireTFA       bool `json:"require_tfa"`
-	*jwt.AccessToken `json:"access_token"`
+	Success     bool             `json:"success"`
+	RequireTFA  bool             `json:"require_tfa"`
+	AccessToken *jwt.AccessToken `json:"access_token"`
 }
 
 func validateLoginRequest(req *loginRequest) (map[string]string, bool) {

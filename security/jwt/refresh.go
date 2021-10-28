@@ -24,7 +24,8 @@ type RefreshTokenClaims struct {
 }
 
 func CreateRefreshToken(userID string, sessionID string) (*RefreshToken, error) {
-	expiresAt := time.Now().Add(7 * 24 * time.Hour)
+	// TODO: make expiration longer, current duration is just for debugging purposes
+	expiresAt := time.Now().Add(10 * time.Minute)
 	jti := string(security.GenerateRandomID())
 
 	claims := RefreshTokenClaims{

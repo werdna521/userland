@@ -15,7 +15,7 @@ import (
 
 type AccessTokenKey string
 
-const TokenContextKey AccessTokenKey = "accesstoken"
+const AccessTokenCtxKey AccessTokenKey = "accesstoken"
 
 func ValidateAccessToken(sr redis.SessionRepository) middleware {
 	return func(next http.Handler) http.Handler {
@@ -24,14 +24,14 @@ func ValidateAccessToken(sr redis.SessionRepository) middleware {
 
 			if authHeader == "" {
 				log.Error().Msg("No authorization header")
-				response.Error(w, e.NewUnauthorizedError("no token provided"))
+				response.Error(w, e.NewUnauthorizedError("no token provided")).JSON()
 				return
 			}
 
 			bearer := strings.Split(authHeader, " ")
 			if len(bearer) != 2 {
 				log.Error().Msg("Invalid authorization header")
-				response.Error(w, e.NewBadRequestError("bad authorization header format"))
+				response.Error(w, e.NewBadRequestError("bad authorization header format")).JSON()
 				return
 			}
 
@@ -40,12 +40,12 @@ func ValidateAccessToken(sr redis.SessionRepository) middleware {
 			at, isValid, err := jwt.ParseAccessToken(jwtString)
 			if !isValid {
 				log.Error().Msg("Invalid access token")
-				response.Error(w, e.NewUnauthorizedError("invalid token"))
+				response.Error(w, e.NewUnauthorizedError("invalid token")).JSON()
 				return
 			}
 			if err != nil {
 				log.Error().Err(err).Msg("failed to parse token")
-				response.Error(w, e.NewInternalServerError())
+				response.Error(w, e.NewInternalServerError()).JSON()
 				return
 			}
 
@@ -58,17 +58,17 @@ func ValidateAccessToken(sr redis.SessionRepository) middleware {
 			})
 			if err != nil {
 				log.Error().Err(err).Msg("failed to retrieve token from redis")
-				response.Error(w, e.NewInternalServerError())
+				response.Error(w, e.NewInternalServerError()).JSON()
 				return
 			}
 
 			if !tokenExists {
 				log.Error().Msg("token does not exist")
-				response.Error(w, e.NewUnauthorizedError("invalid token"))
+				response.Error(w, e.NewUnauthorizedError("invalid token")).JSON()
 				return
 			}
 
-			ctx = context.WithValue(r.Context(), TokenContextKey, at)
+			ctx = context.WithValue(r.Context(), AccessTokenCtxKey, at)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}

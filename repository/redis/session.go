@@ -6,11 +6,18 @@ import (
 	"time"
 
 	"github.com/go-redis/redis/v8"
+	"github.com/rs/zerolog/log"
 	"github.com/werdna521/userland/repository"
 )
 
 type SessionRepository interface {
-	CreateSession(ctx context.Context, s *repository.Session) error
+	CreateSession(ctx context.Context, s *repository.Session, expiresIn time.Duration) error
+	AddUserSession(ctx context.Context, s *repository.Session) error
+	UpdateSessionExpiryTime(
+		ctx context.Context,
+		s *repository.Session,
+		expiresIn time.Duration,
+	) error
 	CreateAccessToken(ctx context.Context,
 		at *repository.AccessToken,
 		expiresIn time.Duration,
@@ -61,6 +68,7 @@ func (r *BaseSessionRepository) toSessionFields(s *repository.Session) map[strin
 func (r *BaseSessionRepository) CreateSession(
 	ctx context.Context,
 	s *repository.Session,
+	expiresIn time.Duration,
 ) error {
 	key := r.getSessionKey(s.UserID, s.ID)
 	now := time.Now()
@@ -68,7 +76,14 @@ func (r *BaseSessionRepository) CreateSession(
 	s.CreatedAt = now
 	s.UpdatedAt = now
 
-	return r.rdb.HSet(ctx, key, r.toSessionFields(s)).Err()
+	err := r.rdb.HSet(ctx, key, r.toSessionFields(s)).Err()
+	if err != nil {
+		log.Error().Err(err).Msg("failed to create session")
+		return err
+	}
+
+	err = r.rdb.Expire(ctx, key, expiresIn).Err()
+	return err
 }
 
 // TODO: make session expire after access token expires
@@ -78,6 +93,24 @@ func (r *BaseSessionRepository) AddUserSession(
 ) error {
 	key := r.getUserSessionsKey(s.UserID)
 	return r.rdb.SAdd(ctx, key, s.ID).Err()
+}
+
+func (r *BaseSessionRepository) UpdateSessionExpiryTime(
+	ctx context.Context,
+	s *repository.Session,
+	expiresIn time.Duration,
+) error {
+	key := r.getSessionKey(s.UserID, s.ID)
+	now := time.Now()
+
+	err := r.rdb.HSet(ctx, key, hSessionUpdatedAtKey, now).Err()
+	if err != nil {
+		log.Error().Err(err).Msg("failed to touch session")
+		return err
+	}
+
+	err = r.rdb.Expire(ctx, key, expiresIn).Err()
+	return err
 }
 
 func (r *BaseSessionRepository) CreateAccessToken(

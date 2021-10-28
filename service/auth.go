@@ -199,6 +199,7 @@ func (s *BaseAuthService) Login(
 		return nil, e.NewInternalServerError()
 	}
 
+	log.Info().Msg("storing access token in redis")
 	token := &repository.AccessToken{
 		ID:        at.JTI,
 		UserID:    at.UserID,
@@ -216,11 +217,13 @@ func (s *BaseAuthService) Login(
 		Client: clientID,
 		UserID: at.UserID,
 	}
-	err = s.sr.CreateSession(ctx, session)
+	err = s.sr.CreateSession(ctx, session, 5*time.Minute)
 	if err != nil {
 		log.Error().Err(err).Msg("failed to store session in redis")
 		return nil, e.NewInternalServerError()
 	}
+
+	// TODO: store sessionID in user's session list in redis
 
 	return at, nil
 }

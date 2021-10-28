@@ -10,6 +10,8 @@ import (
 	"github.com/go-redis/redis/v8"
 	"github.com/rs/zerolog/log"
 	"github.com/werdna521/userland/api/handler/auth"
+	"github.com/werdna521/userland/api/handler/session"
+	"github.com/werdna521/userland/api/middleware"
 	"github.com/werdna521/userland/repository/postgres"
 	rds "github.com/werdna521/userland/repository/redis"
 	"github.com/werdna521/userland/service"
@@ -31,6 +33,7 @@ type repositories struct {
 
 type services struct {
 	as service.AuthService
+	ss service.SessionService
 }
 
 type Config struct {
@@ -97,8 +100,11 @@ func (s *Server) initServices() {
 		s.repositories.sr,
 	)
 
+	ss := service.NewBaseSessionService(s.repositories.sr)
+
 	s.services = &services{
 		as: as,
+		ss: ss,
 	}
 }
 
@@ -118,6 +124,15 @@ func (s *Server) initHandlers() http.Handler {
 			r.Route("/password", func(r chi.Router) {
 				r.Post("/forgot", auth.ForgotPassword(s.services.as))
 				r.Post("/reset", auth.ResetPassword(s.services.as))
+			})
+		})
+
+		r.Route("/me", func(r chi.Router) {
+			r.Route("/session", func(r chi.Router) {
+				r.Group(func(r chi.Router) {
+					r.Use(middleware.ValidateAccessToken(s.repositories.sr))
+					r.Post("/refresh_token", session.GenerateRefreshToken(s.services.ss))
+				})
 			})
 		})
 	})
