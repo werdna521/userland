@@ -132,6 +132,7 @@ func (s *Server) initHandlers() http.Handler {
 				r.Use(middleware.ValidateAccessToken(s.repositories.sr))
 
 				r.Get("/", session.ListSessions(s.services.ss))
+				r.Delete("/", session.EndCurrentSession(s.services.ss))
 				r.Post("/refresh_token", session.GenerateRefreshToken(s.services.ss))
 			})
 

@@ -14,6 +14,7 @@ type SessionRepository interface {
 	CreateSession(ctx context.Context, s *repository.Session, expiresIn time.Duration) error
 	GetSession(ctx context.Context, userID string, sessionID string) (*repository.Session, error)
 	GetAllSessions(ctx context.Context, userID string) ([]*repository.Session, error)
+	DeleteSession(ctx context.Context, s *repository.Session) error
 	AddUserSessionToIndex(ctx context.Context, s *repository.Session) error
 	RemoveUserSessionFromIndex(ctx context.Context, userID string, sessionID string) error
 	UpdateSessionExpiryTime(
@@ -26,11 +27,13 @@ type SessionRepository interface {
 		expiresIn time.Duration,
 	) error
 	CheckAccessToken(ctx context.Context, at *repository.AccessToken) (bool, error)
+	DeleteAccessToken(ctx context.Context, at *repository.AccessToken) error
 	CreateRefreshToken(ctx context.Context,
 		rt *repository.RefreshToken,
 		expiresIn time.Duration,
 	) error
 	CheckRefreshToken(ctx context.Context, rt *repository.RefreshToken) (bool, error)
+	DeleteRefreshToken(ctx context.Context, rt *repository.RefreshToken) error
 }
 
 type BaseSessionRepository struct {
@@ -43,6 +46,7 @@ func NewBaseSessionRepository(rdb *redis.Client) *BaseSessionRepository {
 	}
 }
 
+// TODO: get keys shouldn't accept struct as params
 func (r *BaseSessionRepository) getSessionKey(userID string, sessionID string) string {
 	return fmt.Sprintf("%s:%s:%s:%s", userKey, userID, sessionKey, sessionID)
 }
@@ -163,6 +167,14 @@ func (r *BaseSessionRepository) GetAllSessions(
 	return sessions, nil
 }
 
+func (r *BaseSessionRepository) DeleteSession(
+	ctx context.Context,
+	s *repository.Session,
+) error {
+	key := r.getSessionKey(s.UserID, s.ID)
+	return r.rdb.Unlink(ctx, key).Err()
+}
+
 // a tiny problem with redis: we can't set expiration time for a single element
 // in a set. we'll have to handle deletion manually in the code :(
 func (r *BaseSessionRepository) AddUserSessionToIndex(
@@ -235,6 +247,14 @@ func (r *BaseSessionRepository) CheckAccessToken(
 	return jti == at.ID, nil
 }
 
+func (r *BaseSessionRepository) DeleteAccessToken(
+	ctx context.Context,
+	at *repository.AccessToken,
+) error {
+	key := r.getAccessTokenKey(at)
+	return r.rdb.Unlink(ctx, key).Err()
+}
+
 func (r *BaseSessionRepository) CreateRefreshToken(
 	ctx context.Context,
 	rt *repository.RefreshToken,
@@ -259,4 +279,12 @@ func (r *BaseSessionRepository) CheckRefreshToken(
 	}
 
 	return jti == rt.ID, nil
+}
+
+func (r *BaseSessionRepository) DeleteRefreshToken(
+	ctx context.Context,
+	rt *repository.RefreshToken,
+) error {
+	key := r.getRefreshTokenKey(rt)
+	return r.rdb.Unlink(ctx, key).Err()
 }

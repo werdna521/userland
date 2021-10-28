@@ -14,6 +14,7 @@ type SessionService interface {
 	GenerateRefreshToken(ctx context.Context, at *jwt.AccessToken) (*jwt.RefreshToken, e.Error)
 	GenerateAccessToken(ctx context.Context, rt *jwt.RefreshToken) (*jwt.AccessToken, e.Error)
 	ListSessions(ctx context.Context, at *jwt.AccessToken) ([]*repository.Session, e.Error)
+	RemoveSession(ctx context.Context, session *repository.Session) e.Error
 }
 
 type BaseSessionService struct {
@@ -112,4 +113,47 @@ func (s *BaseSessionService) ListSessions(
 	}
 
 	return sessions, nil
+}
+
+func (s *BaseSessionService) RemoveSession(
+	ctx context.Context,
+	session *repository.Session,
+) e.Error {
+	log.Info().Msg("removing session from redis")
+	err := s.sr.DeleteSession(ctx, session)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to remove session from redis")
+		return e.NewInternalServerError()
+	}
+
+	accessToken := &repository.AccessToken{
+		UserID:    session.UserID,
+		SessionID: session.ID,
+	}
+	log.Info().Msg("revoking access token")
+	err = s.sr.DeleteAccessToken(ctx, accessToken)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to revoke access token")
+		return e.NewInternalServerError()
+	}
+
+	refreshToken := &repository.RefreshToken{
+		UserID:    session.UserID,
+		SessionID: session.ID,
+	}
+	log.Info().Msg("revoking refresh token")
+	err = s.sr.DeleteRefreshToken(ctx, refreshToken)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to revoke refresh token")
+		return e.NewInternalServerError()
+	}
+
+	log.Info().Msg("removing session id from index")
+	err = s.sr.RemoveUserSessionFromIndex(ctx, session.UserID, session.ID)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to remove session id from index")
+		return e.NewInternalServerError()
+	}
+
+	return nil
 }

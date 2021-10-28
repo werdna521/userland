@@ -65,7 +65,7 @@ func (r *BaseTokenRepository) DeleteForgotPasswordToken(
 ) error {
 	key := r.getForgotPasswordTokenKey(token)
 
-	err := r.rdb.Del(ctx, key).Err()
+	err := r.rdb.Unlink(ctx, key).Err()
 	if err == redis.Nil {
 		return repository.NewNotFoundError()
 	}
@@ -102,7 +102,7 @@ func (r *BaseTokenRepository) DeleteEmailVerificationToken(
 ) error {
 	key := r.getEmailVerificationTokenKey(userID)
 
-	err := r.rdb.Del(ctx, key).Err()
+	err := r.rdb.Unlink(ctx, key).Err()
 	if err == redis.Nil {
 		return repository.NewNotFoundError()
 	}

@@ -6,6 +6,7 @@ import (
 
 	"github.com/werdna521/userland/api/request"
 	"github.com/werdna521/userland/api/response"
+	"github.com/werdna521/userland/repository"
 	"github.com/werdna521/userland/service"
 )
 
@@ -59,6 +60,35 @@ func ListSessions(ss service.SessionService) http.HandlerFunc {
 		response.OK(w, &listSessionsResponse{
 			Success:  true,
 			Sessions: userSessions,
+		}).JSON()
+	}
+}
+
+type deleteSessionResponse struct {
+	Success bool `json:"success"`
+}
+
+func EndCurrentSession(ss service.SessionService) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		at, err := request.GetAccessTokenFromCtx(ctx)
+		if err != nil {
+			response.Error(w, err).JSON()
+			return
+		}
+
+		session := &repository.Session{
+			ID:     at.SessionID,
+			UserID: at.UserID,
+		}
+		err = ss.RemoveSession(ctx, session)
+		if err != nil {
+			response.Error(w, err).JSON()
+			return
+		}
+
+		response.OK(w, &deleteSessionResponse{
+			Success: true,
 		}).JSON()
 	}
 }
