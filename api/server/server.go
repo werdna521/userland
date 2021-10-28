@@ -129,15 +129,15 @@ func (s *Server) initHandlers() http.Handler {
 
 		r.Route("/me", func(r chi.Router) {
 			r.Route("/session", func(r chi.Router) {
-				r.Group(func(r chi.Router) {
-					r.Use(middleware.ValidateAccessToken(s.repositories.sr))
-					r.Post("/refresh_token", session.GenerateRefreshToken(s.services.ss))
-				})
+				r.Use(middleware.ValidateAccessToken(s.repositories.sr))
 
-				r.Group(func(r chi.Router) {
-					r.Use(middleware.ValidateRefreshToken(s.repositories.sr))
-					r.Post("/access_token", session.GenerateAccessToken(s.services.ss))
-				})
+				r.Get("/", session.ListSessions(s.services.ss))
+				r.Post("/refresh_token", session.GenerateRefreshToken(s.services.ss))
+			})
+
+			r.Group(func(r chi.Router) {
+				r.Use(middleware.ValidateRefreshToken(s.repositories.sr))
+				r.Post("/session/access_token", session.GenerateAccessToken(s.services.ss))
 			})
 		})
 	})

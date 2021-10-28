@@ -3,8 +3,7 @@ package session
 import (
 	"net/http"
 
-	e "github.com/werdna521/userland/api/error"
-	"github.com/werdna521/userland/api/middleware"
+	"github.com/werdna521/userland/api/request"
 	"github.com/werdna521/userland/api/response"
 	"github.com/werdna521/userland/security/jwt"
 	"github.com/werdna521/userland/service"
@@ -18,9 +17,9 @@ type generateRefreshTokenResponse struct {
 func GenerateRefreshToken(ss service.SessionService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
-		at, ok := ctx.Value(middleware.AccessTokenCtxKey).(*jwt.AccessToken)
-		if !ok {
-			response.Error(w, e.NewBadRequestError("cannot parse access token"))
+		at, err := request.GetAccessTokenFromCtx(ctx)
+		if err != nil {
+			response.Error(w, err).JSON()
 			return
 		}
 

@@ -12,7 +12,6 @@ const (
 	accessTokenKey  = "accesstoken"
 	refreshTokenKey = "refreshtoken"
 
-	hSessionIDKey        = "id"
 	hSessionClientKey    = "client"
 	hSessionCreatedAtKey = "created_at"
 	hSessionUpdatedAtKey = "updated_at"

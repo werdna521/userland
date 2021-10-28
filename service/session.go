@@ -13,6 +13,7 @@ import (
 type SessionService interface {
 	GenerateRefreshToken(ctx context.Context, at *jwt.AccessToken) (*jwt.RefreshToken, e.Error)
 	GenerateAccessToken(ctx context.Context, rt *jwt.RefreshToken) (*jwt.AccessToken, e.Error)
+	ListSessions(ctx context.Context, at *jwt.AccessToken) ([]*repository.Session, e.Error)
 }
 
 type BaseSessionService struct {
@@ -97,4 +98,18 @@ func (s *BaseSessionService) GenerateAccessToken(
 	}
 
 	return at, nil
+}
+
+func (s *BaseSessionService) ListSessions(
+	ctx context.Context,
+	at *jwt.AccessToken,
+) ([]*repository.Session, e.Error) {
+	log.Info().Msg("getting all active sessions")
+	sessions, err := s.sr.GetAllSessions(ctx, at.UserID)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to get all active sessions")
+		return nil, e.NewInternalServerError()
+	}
+
+	return sessions, nil
 }

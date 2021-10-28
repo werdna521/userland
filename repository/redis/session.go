@@ -12,7 +12,10 @@ import (
 
 type SessionRepository interface {
 	CreateSession(ctx context.Context, s *repository.Session, expiresIn time.Duration) error
-	AddUserSession(ctx context.Context, s *repository.Session) error
+	GetSession(ctx context.Context, userID string, sessionID string) (*repository.Session, error)
+	GetAllSessions(ctx context.Context, userID string) ([]*repository.Session, error)
+	AddUserSessionToIndex(ctx context.Context, s *repository.Session) error
+	RemoveUserSessionFromIndex(ctx context.Context, userID string, sessionID string) error
 	UpdateSessionExpiryTime(
 		ctx context.Context,
 		s *repository.Session,
@@ -44,7 +47,7 @@ func (r *BaseSessionRepository) getSessionKey(userID string, sessionID string) s
 	return fmt.Sprintf("%s:%s:%s:%s", userKey, userID, sessionKey, sessionID)
 }
 
-func (r *BaseSessionRepository) getUserSessionsKey(userID string) string {
+func (r *BaseSessionRepository) getSessionIndexKey(userID string) string {
 	return fmt.Sprintf("%s:%s:%s", userKey, userID, sessionKey)
 }
 
@@ -58,7 +61,6 @@ func (r *BaseSessionRepository) getRefreshTokenKey(rt *repository.RefreshToken) 
 
 func (r *BaseSessionRepository) toSessionFields(s *repository.Session) map[string]interface{} {
 	return map[string]interface{}{
-		hSessionIDKey:        s.ID,
 		hSessionClientKey:    s.Client,
 		hSessionCreatedAtKey: s.CreatedAt,
 		hSessionUpdatedAtKey: s.UpdatedAt,
@@ -87,13 +89,97 @@ func (r *BaseSessionRepository) CreateSession(
 	return err
 }
 
-// TODO: make session expire after access token expires
-func (r *BaseSessionRepository) AddUserSession(
+func (r *BaseSessionRepository) GetSession(
+	ctx context.Context,
+	userID string,
+	sessionID string,
+) (*repository.Session, error) {
+	key := r.getSessionKey(userID, sessionID)
+
+	res, err := r.rdb.HGetAll(ctx, key).Result()
+	if len(res) == 0 {
+		return nil, repository.NewNotFoundError()
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	createdAt, err := time.Parse(time.RFC3339, res[hSessionCreatedAtKey])
+	if err != nil {
+		log.Debug().Msg(sessionID)
+		log.Error().Err(err).Msg("failed to parse created_at timestamp")
+		return nil, err
+	}
+
+	updatedAt, err := time.Parse(time.RFC3339, res[hSessionUpdatedAtKey])
+	if err != nil {
+		log.Error().Err(err).Msg("failed to parse updated_at timestamp")
+		return nil, err
+	}
+
+	session := &repository.Session{
+		ID:        sessionID,
+		UserID:    userID,
+		Client:    res[hSessionClientKey],
+		CreatedAt: createdAt,
+		UpdatedAt: updatedAt,
+	}
+	return session, nil
+}
+
+func (r *BaseSessionRepository) GetAllSessions(
+	ctx context.Context,
+	userID string,
+) ([]*repository.Session, error) {
+	sessionIndexKey := r.getSessionIndexKey(userID)
+
+	sessionIDs, err := r.rdb.SMembers(ctx, sessionIndexKey).Result()
+	if err != nil {
+		return nil, err
+	}
+
+	sessions := []*repository.Session{}
+	for _, sessionID := range sessionIDs {
+		session, err := r.GetSession(ctx, userID, sessionID)
+
+		// if session is not found, this means the session is expired, hence we
+		// remove it from the index
+		if _, ok := err.(repository.NotFoundError); ok {
+			err = r.RemoveUserSessionFromIndex(ctx, userID, sessionID)
+			if err != nil {
+				log.Error().Err(err).Msg("failed to remove session from index")
+				return nil, err
+			}
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
+
+		// else, we append to the slice
+		sessions = append(sessions, session)
+	}
+
+	return sessions, nil
+}
+
+// a tiny problem with redis: we can't set expiration time for a single element
+// in a set. we'll have to handle deletion manually in the code :(
+func (r *BaseSessionRepository) AddUserSessionToIndex(
 	ctx context.Context,
 	s *repository.Session,
 ) error {
-	key := r.getUserSessionsKey(s.UserID)
+	key := r.getSessionIndexKey(s.UserID)
 	return r.rdb.SAdd(ctx, key, s.ID).Err()
+}
+
+func (r *BaseSessionRepository) RemoveUserSessionFromIndex(
+	ctx context.Context,
+	userID string,
+	sessionID string,
+) error {
+	key := r.getSessionIndexKey(userID)
+	return r.rdb.SRem(ctx, key, sessionID).Err()
 }
 
 func (r *BaseSessionRepository) UpdateSessionExpiryTime(

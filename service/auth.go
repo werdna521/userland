@@ -222,7 +222,12 @@ func (s *BaseAuthService) Login(
 		return nil, e.NewInternalServerError()
 	}
 
-	// TODO: store sessionID in user's session list in redis
+	log.Info().Msg("adding the session id to a user session index set")
+	err = s.sr.AddUserSessionToIndex(ctx, session)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to add the session id to the index set")
+		return nil, e.NewInternalServerError()
+	}
 
 	return at, nil
 }
