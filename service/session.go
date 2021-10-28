@@ -8,6 +8,7 @@ import (
 	"github.com/werdna521/userland/repository"
 	"github.com/werdna521/userland/repository/redis"
 	"github.com/werdna521/userland/security/jwt"
+	"github.com/werdna521/userland/utils/slice"
 )
 
 type SessionService interface {
@@ -15,6 +16,7 @@ type SessionService interface {
 	GenerateAccessToken(ctx context.Context, rt *jwt.RefreshToken) (*jwt.AccessToken, e.Error)
 	ListSessions(ctx context.Context, at *jwt.AccessToken) ([]*repository.Session, e.Error)
 	RemoveSession(ctx context.Context, session *repository.Session) e.Error
+	RemoveAllOtherSessions(ctx context.Context, session *repository.Session) e.Error
 }
 
 type BaseSessionService struct {
@@ -153,6 +155,34 @@ func (s *BaseSessionService) RemoveSession(
 	if err != nil {
 		log.Error().Err(err).Msg("failed to remove session id from index")
 		return e.NewInternalServerError()
+	}
+
+	return nil
+}
+
+func (s *BaseSessionService) RemoveAllOtherSessions(
+	ctx context.Context,
+	session *repository.Session,
+) e.Error {
+	log.Info().Msg("getting all active sessions")
+	sessions, err := s.sr.GetAllSessions(ctx, session.UserID)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to get all active sessions")
+		return e.NewInternalServerError()
+	}
+
+	log.Info().Msg("removing current session from sessions list")
+	sessions = slice.FilterSession(sessions, func(s *repository.Session) bool {
+		return s.ID != session.ID
+	})
+
+	log.Info().Msg("removing all other sessions from redis")
+	for _, session := range sessions {
+		err = s.RemoveSession(ctx, session)
+		if err != nil {
+			log.Error().Err(err).Msgf("failed to remove session %s", session.ID)
+			return e.NewInternalServerError()
+		}
 	}
 
 	return nil

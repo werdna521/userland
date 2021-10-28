@@ -133,6 +133,7 @@ func (s *Server) initHandlers() http.Handler {
 
 				r.Get("/", session.ListSessions(s.services.ss))
 				r.Delete("/", session.EndCurrentSession(s.services.ss))
+				r.Delete("/other", session.DeleteAllOtherSessions(s.services.ss))
 				r.Post("/refresh_token", session.GenerateRefreshToken(s.services.ss))
 			})
 
