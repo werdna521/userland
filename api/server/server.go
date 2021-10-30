@@ -140,6 +140,12 @@ func (s *Server) initHandlers() http.Handler {
 				r.Post("/", user.UpdateBasicInfo(s.services.us))
 			})
 
+			r.Route("/email", func(r chi.Router) {
+				r.Use(middleware.ValidateAccessToken(s.repositories.sr))
+
+				r.Get("/", user.GetCurrentEmailAddress(s.services.us))
+			})
+
 			r.Route("/session", func(r chi.Router) {
 				r.Use(middleware.ValidateAccessToken(s.repositories.sr))
 

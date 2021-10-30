@@ -12,6 +12,7 @@ import (
 type UserService interface {
 	GetInfoDetail(ctx context.Context, userID string) (*repository.UserBio, e.Error)
 	UpdateBasicInfo(ctx context.Context, userID string, ub *repository.UserBio) e.Error
+	GetCurrentEmail(ctx context.Context, userID string) (string, e.Error)
 }
 
 type BaseUserService struct {
@@ -42,6 +43,25 @@ func (s *BaseUserService) GetInfoDetail(
 	}
 
 	return ub, nil
+}
+
+func (s *BaseUserService) GetCurrentEmail(
+	ctx context.Context,
+	userID string,
+) (string, e.Error) {
+	log.Info().Msg("getting user from the database")
+	u, err := s.ur.GetUserByID(ctx, userID)
+	if _, ok := err.(repository.NotFoundError); ok {
+		// this shouldn't happen in an ideal scenario
+		log.Error().Err(err).Msg("user not found")
+		return "", e.NewNotFoundError("user not found")
+	}
+	if err != nil {
+		log.Error().Err(err).Msg("failed to get user from the database")
+		return "", e.NewInternalServerError()
+	}
+
+	return u.Email, nil
 }
 
 func (s *BaseUserService) UpdateBasicInfo(
