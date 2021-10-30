@@ -15,12 +15,22 @@ import (
 const (
 	userTableName             = `"user"`
 	userTableIDColName        = "id"
-	userTableFullNameColName  = "fullname"
 	userTableEmailColName     = "email"
 	userTablePasswordColName  = "password"
 	userTableIsActiveColName  = "is_active"
 	userTableCreatedAtColName = "created_at"
 	userTableUpdatedAtColName = "updated_at"
+
+	userBioTableName             = "user_bio"
+	userBioTableIDColName        = "id"
+	userBioTableUserIDColName    = "user_id"
+	userBioTableFullNameColName  = "fullname"
+	userBioTableLocationColName  = "location"
+	userBioTableBioColName       = "bio"
+	userBioTableWebColName       = "web"
+	userBioTablePictureColName   = "picture"
+	userBioTableCreatedAtColName = "created_at"
+	userBioTableUpdatedAtColName = "updated_at"
 )
 
 type UserRepository interface {
@@ -28,6 +38,7 @@ type UserRepository interface {
 	TearDownStatements()
 	CreateUser(ctx context.Context, user *repository.User) (*repository.User, error)
 	GetUserByID(ctx context.Context, userID string) (*repository.User, error)
+	GetUserBioByID(ctx context.Context, userID string) (*repository.UserBio, error)
 	GetUserByEmail(ctx context.Context, email string) (*repository.User, error)
 	UpdateUserActivationStatusByID(
 		ctx context.Context,
@@ -48,8 +59,10 @@ type BaseUserRepository struct {
 
 type userStatements struct {
 	createUserStmt                     *sql.Stmt
+	createUserBioStmt                  *sql.Stmt
 	getUserByIDStmt                    *sql.Stmt
 	getUserByEmailStmt                 *sql.Stmt
+	getUserBioByIDStmt                 *sql.Stmt
 	updateUserActivationStatusByIDStmt *sql.Stmt
 	updatePasswordByIDStmt             *sql.Stmt
 }
@@ -63,7 +76,6 @@ func NewBaseUserRepository(db *sql.DB) *BaseUserRepository {
 func (r *BaseUserRepository) scanUser(u *repository.User, row *sql.Row) error {
 	return row.Scan(
 		&u.ID,
-		&u.Fullname,
 		&u.Email,
 		&u.Password,
 		&u.IsActive,
@@ -72,17 +84,43 @@ func (r *BaseUserRepository) scanUser(u *repository.User, row *sql.Row) error {
 	)
 }
 
+func (r *BaseUserRepository) scanUserBio(ub *repository.UserBio, row *sql.Row) error {
+	return row.Scan(
+		&ub.ID,
+		&ub.Fullname,
+		&ub.Location,
+		&ub.Bio,
+		&ub.Web,
+		&ub.Picture,
+		&ub.CreatedAt,
+		&ub.UpdatedAt,
+	)
+}
+
 func (r *BaseUserRepository) PrepareStatements(ctx context.Context) error {
 	log.Info().Msg("preparing create user statement")
 	query := fmt.Sprintf(
 		`INSERT INTO %s
-		 VALUES(DEFAULT, $1, $2, $3, $4, $5, $6)
+		 VALUES(DEFAULT, $1, $2, $3, $4, $5)
 		 RETURNING id`,
 		userTableName,
 	)
 	createUserStmt, err := r.db.PrepareContext(ctx, query)
 	if err != nil {
 		log.Error().Err(err).Msg("failed to prepare create user statement")
+		return err
+	}
+
+	log.Info().Msg("preparing create user bio statement")
+	query = fmt.Sprintf(
+		`INSERT INTO %s
+		 VALUES(DEFAULT, $1, $2, $3, $4, $5, $6, $7, $8)
+		 RETURNING id`,
+		userBioTableName,
+	)
+	createUserBioStmt, err := r.db.PrepareContext(ctx, query)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to prepare create user bio statement")
 		return err
 	}
 
@@ -111,6 +149,28 @@ func (r *BaseUserRepository) PrepareStatements(ctx context.Context) error {
 	getUserByEmailStmt, err := r.db.PrepareContext(ctx, query)
 	if err != nil {
 		log.Error().Err(err).Msg("failed to prepare get user by email statement")
+		return err
+	}
+
+	log.Info().Msg("preparing get user bio by id statement")
+	query = fmt.Sprintf(
+		`SELECT %s, %s, %s, %s, %s, %s, %s, %s
+		 FROM %s
+		 WHERE %s = $1`,
+		userBioTableIDColName,
+		userBioTableFullNameColName,
+		userBioTableLocationColName,
+		userBioTableBioColName,
+		userBioTableWebColName,
+		userBioTablePictureColName,
+		userBioTableCreatedAtColName,
+		userBioTableUpdatedAtColName,
+		userBioTableName,
+		userBioTableUserIDColName,
+	)
+	getUserBioByIDStmt, err := r.db.PrepareContext(ctx, query)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to prepare get user bio by id statement")
 		return err
 	}
 
@@ -153,8 +213,10 @@ func (r *BaseUserRepository) PrepareStatements(ctx context.Context) error {
 
 	r.statements = &userStatements{
 		createUserStmt:                     createUserStmt,
+		createUserBioStmt:                  createUserBioStmt,
 		getUserByIDStmt:                    getUserByIDStmt,
 		getUserByEmailStmt:                 getUserByEmailStmt,
+		getUserBioByIDStmt:                 getUserBioByIDStmt,
 		updateUserActivationStatusByIDStmt: updateUserActivationStatusByIDStmt,
 		updatePasswordByIDStmt:             UpdatePasswordByIDStmt,
 	}
@@ -177,13 +239,18 @@ func (r *BaseUserRepository) CreateUser(
 
 	log.Info().Msg("running statement to create user")
 	err := r.statements.createUserStmt.
-		QueryRowContext(ctx, u.Fullname, u.Email, u.Password, u.IsActive, now, now).
+		QueryRowContext(ctx, u.Email, u.Password, u.IsActive, now, now).
 		Scan(&u.ID)
 
 	if err, ok := err.(*pgconn.PgError); ok && err.Code == pgerrcode.UniqueViolation {
 		log.Error().Err(err).Msg("violated unique email constraint")
 		return nil, repository.NewUniqueViolationError()
 	}
+
+	log.Info().Msg("running statement to create user bio")
+	err = r.statements.createUserBioStmt.
+		QueryRowContext(ctx, u.ID, u.UserBio.Fullname, "", "", "", "", now, now).
+		Scan(&u.UserBio.ID)
 
 	return u, err
 }
@@ -220,6 +287,23 @@ func (r *BaseUserRepository) GetUserByEmail(
 	}
 
 	return u, err
+}
+
+func (r *BaseUserRepository) GetUserBioByID(
+	ctx context.Context,
+	userID string,
+) (*repository.UserBio, error) {
+	ub := &repository.UserBio{}
+
+	log.Info().Msg("running statement to get user bio by id")
+	row := r.statements.getUserBioByIDStmt.QueryRowContext(ctx, userID)
+	err := r.scanUserBio(ub, row)
+	if err == sql.ErrNoRows {
+		log.Error().Err(err).Msg("failed to find user bio")
+		return nil, repository.NewNotFoundError()
+	}
+
+	return ub, err
 }
 
 func (r *BaseUserRepository) UpdateUserActivationStatusByID(

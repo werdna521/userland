@@ -64,9 +64,11 @@ func Register(as service.AuthService) http.HandlerFunc {
 		}
 
 		u := &repository.User{
-			Fullname: req.Fullname,
 			Email:    req.Email,
 			Password: req.Password,
+			UserBio: &repository.UserBio{
+				Fullname: req.Fullname,
+			},
 		}
 
 		ctx := r.Context()

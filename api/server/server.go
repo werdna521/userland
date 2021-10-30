@@ -11,6 +11,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/werdna521/userland/api/handler/auth"
 	"github.com/werdna521/userland/api/handler/session"
+	"github.com/werdna521/userland/api/handler/user"
 	"github.com/werdna521/userland/api/middleware"
 	"github.com/werdna521/userland/repository/postgres"
 	rds "github.com/werdna521/userland/repository/redis"
@@ -34,6 +35,7 @@ type repositories struct {
 type services struct {
 	as service.AuthService
 	ss service.SessionService
+	us service.UserService
 }
 
 type Config struct {
@@ -102,9 +104,12 @@ func (s *Server) initServices() {
 
 	ss := service.NewBaseSessionService(s.repositories.sr)
 
+	us := service.NewBaseUserService(s.repositories.ur)
+
 	s.services = &services{
 		as: as,
 		ss: ss,
+		us: us,
 	}
 }
 
@@ -128,6 +133,12 @@ func (s *Server) initHandlers() http.Handler {
 		})
 
 		r.Route("/me", func(r chi.Router) {
+			r.Group(func(r chi.Router) {
+				r.Use(middleware.ValidateAccessToken(s.repositories.sr))
+
+				r.Get("/", user.GetInfoDetail(s.services.us))
+			})
+
 			r.Route("/session", func(r chi.Router) {
 				r.Use(middleware.ValidateAccessToken(s.repositories.sr))
 
