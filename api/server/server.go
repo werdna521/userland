@@ -137,6 +137,7 @@ func (s *Server) initHandlers() http.Handler {
 				r.Use(middleware.ValidateAccessToken(s.repositories.sr))
 
 				r.Get("/", user.GetInfoDetail(s.services.us))
+				r.Post("/", user.UpdateBasicInfo(s.services.us))
 			})
 
 			r.Route("/session", func(r chi.Router) {

@@ -11,6 +11,7 @@ import (
 
 type UserService interface {
 	GetInfoDetail(ctx context.Context, userID string) (*repository.UserBio, e.Error)
+	UpdateBasicInfo(ctx context.Context, userID string, ub *repository.UserBio) e.Error
 }
 
 type BaseUserService struct {
@@ -41,4 +42,19 @@ func (s *BaseUserService) GetInfoDetail(
 	}
 
 	return ub, nil
+}
+
+func (s *BaseUserService) UpdateBasicInfo(
+	ctx context.Context,
+	userID string,
+	ub *repository.UserBio,
+) e.Error {
+	log.Info().Msg("updating user bio in database")
+	_, err := s.ur.UpdateUserBioByID(ctx, userID, ub)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to update user bio in the database")
+		return e.NewInternalServerError()
+	}
+
+	return nil
 }

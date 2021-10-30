@@ -50,6 +50,11 @@ type UserRepository interface {
 		userID string,
 		password string,
 	) (*repository.User, error)
+	UpdateUserBioByID(
+		ctx context.Context,
+		userID string,
+		ub *repository.UserBio,
+	) (*repository.UserBio, error)
 }
 
 type BaseUserRepository struct {
@@ -65,6 +70,7 @@ type userStatements struct {
 	getUserBioByIDStmt                 *sql.Stmt
 	updateUserActivationStatusByIDStmt *sql.Stmt
 	updatePasswordByIDStmt             *sql.Stmt
+	updateUserBioByIDStmt              *sql.Stmt
 }
 
 func NewBaseUserRepository(db *sql.DB) *BaseUserRepository {
@@ -209,6 +215,52 @@ func (r *BaseUserRepository) PrepareStatements(ctx context.Context) error {
 	UpdatePasswordByIDStmt, err := r.db.PrepareContext(ctx, query)
 	if err != nil {
 		log.Error().Err(err).Msg("failed to prepare update password by email statement")
+		return err
+	}
+
+	log.Info().Msg("preparing update user bio by id statement")
+	query = fmt.Sprintf(
+		`UPDATE %s
+		 SET 
+		   %s = $1,
+			 %s = CASE
+							WHEN $2 = '' THEN %s
+							ELSE $2
+						END,
+			 %s = CASE
+							WHEN $3 = '' THEN %s
+							ELSE $3
+						END,
+			 %s = CASE
+							WHEN $4 = '' THEN %s
+							ELSE $4
+						END,
+			 %s = $5
+		 WHERE %s = $6
+		 RETURNING %s, %s, %s, %s, %s, %s, %s, %s`,
+		userBioTableName,
+		userBioTableFullNameColName,
+		userBioTableLocationColName,
+		userBioTableLocationColName,
+		userBioTableBioColName,
+		userBioTableBioColName,
+		userBioTableWebColName,
+		userBioTableWebColName,
+		userBioTableUpdatedAtColName,
+		userBioTableUserIDColName,
+		userBioTableIDColName,
+		userBioTableFullNameColName,
+		userBioTableLocationColName,
+		userBioTableBioColName,
+		userBioTableWebColName,
+		userBioTablePictureColName,
+		userBioTableCreatedAtColName,
+		userBioTableUpdatedAtColName,
+	)
+	updateUserBioByIDStmt, err := r.db.PrepareContext(ctx, query)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to prepare update user bio by id statement")
+		return err
 	}
 
 	r.statements = &userStatements{
@@ -219,6 +271,7 @@ func (r *BaseUserRepository) PrepareStatements(ctx context.Context) error {
 		getUserBioByIDStmt:                 getUserBioByIDStmt,
 		updateUserActivationStatusByIDStmt: updateUserActivationStatusByIDStmt,
 		updatePasswordByIDStmt:             UpdatePasswordByIDStmt,
+		updateUserBioByIDStmt:              updateUserBioByIDStmt,
 	}
 
 	return nil
@@ -334,4 +387,19 @@ func (r *BaseUserRepository) UpdatePasswordByID(
 	err := r.scanUser(u, row)
 
 	return u, err
+}
+
+func (r *BaseUserRepository) UpdateUserBioByID(
+	ctx context.Context,
+	userID string,
+	ub *repository.UserBio,
+) (*repository.UserBio, error) {
+	now := time.Now()
+
+	log.Info().Msg("running statement to update user bio by id")
+	row := r.statements.updateUserBioByIDStmt.
+		QueryRowContext(ctx, ub.Fullname, ub.Location, ub.Bio, ub.Web, now, userID)
+	err := r.scanUserBio(ub, row)
+
+	return ub, err
 }

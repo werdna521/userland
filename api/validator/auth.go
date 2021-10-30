@@ -3,25 +3,6 @@ package validator
 import "strings"
 
 const (
-	fullnameMaxChars  = 128
-	fullnameFieldname = "fullname"
-)
-
-func ValidateFullname(fullname string) (string, bool) {
-	errMsg, ok := validateStringRequired(fullname, fullnameFieldname)
-	if !ok {
-		return errMsg, false
-	}
-
-	errMsg, ok = validateStringMaxChars(fullname, fullnameMaxChars, fullnameFieldname)
-	if !ok {
-		return errMsg, false
-	}
-
-	return "", true
-}
-
-const (
 	emailMaxChars  = 128
 	emailFieldname = "email"
 )
