@@ -1,10 +1,14 @@
 package redis
 
 const (
-	userKey           = "user"
-	verificationKey   = "verification"
-	forgotPasswordKey = "forgotPassword"
-	tokenKey          = "token"
+	userKey                    = "user"
+	verificationKey            = "verification"
+	forgotPasswordKey          = "forgotPassword"
+	tokenKey                   = "token"
+	emailChangeVerificationKey = "emailChangeVerification"
+
+	hEmailChangeNewEmailKey = "email"
+	hEmailChangeToken       = "token"
 )
 
 const (

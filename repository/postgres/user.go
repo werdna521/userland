@@ -50,6 +50,11 @@ type UserRepository interface {
 		userID string,
 		password string,
 	) (*repository.User, error)
+	UpdateEmailByID(
+		ctx context.Context,
+		userID string,
+		email string,
+	) (*repository.User, error)
 	UpdateUserBioByID(
 		ctx context.Context,
 		userID string,
@@ -70,6 +75,7 @@ type userStatements struct {
 	getUserBioByIDStmt                 *sql.Stmt
 	updateUserActivationStatusByIDStmt *sql.Stmt
 	updatePasswordByIDStmt             *sql.Stmt
+	updateEmailByIDStmt                *sql.Stmt
 	updateUserBioByIDStmt              *sql.Stmt
 }
 
@@ -218,6 +224,25 @@ func (r *BaseUserRepository) PrepareStatements(ctx context.Context) error {
 		return err
 	}
 
+	log.Info().Msg("preparing update email by id statement")
+	query = fmt.Sprintf(
+		`UPDATE %s
+		 SET
+		   %s = $1,
+			 %s = $2
+		 WHERE %s = $3
+		 RETURNING *`,
+		userTableName,
+		userTableEmailColName,
+		userTableUpdatedAtColName,
+		userTableIDColName,
+	)
+	updateEmailByIDStmt, err := r.db.PrepareContext(ctx, query)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to prepare update email by id statement")
+		return err
+	}
+
 	log.Info().Msg("preparing update user bio by id statement")
 	query = fmt.Sprintf(
 		`UPDATE %s
@@ -271,6 +296,7 @@ func (r *BaseUserRepository) PrepareStatements(ctx context.Context) error {
 		getUserBioByIDStmt:                 getUserBioByIDStmt,
 		updateUserActivationStatusByIDStmt: updateUserActivationStatusByIDStmt,
 		updatePasswordByIDStmt:             UpdatePasswordByIDStmt,
+		updateEmailByIDStmt:                updateEmailByIDStmt,
 		updateUserBioByIDStmt:              updateUserBioByIDStmt,
 	}
 
@@ -384,6 +410,21 @@ func (r *BaseUserRepository) UpdatePasswordByID(
 
 	log.Info().Msg("running statement to update password by email")
 	row := r.statements.updatePasswordByIDStmt.QueryRowContext(ctx, password, now, userID)
+	err := r.scanUser(u, row)
+
+	return u, err
+}
+
+func (r *BaseUserRepository) UpdateEmailByID(
+	ctx context.Context,
+	userID string,
+	email string,
+) (*repository.User, error) {
+	u := &repository.User{}
+	now := time.Now()
+
+	log.Info().Msg("running statement to update email by id")
+	row := r.statements.updateEmailByIDStmt.QueryRowContext(ctx, email, now, userID)
 	err := r.scanUser(u, row)
 
 	return u, err
