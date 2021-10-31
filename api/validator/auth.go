@@ -35,18 +35,18 @@ const (
 	passwordFieldname = "password"
 )
 
-func ValidatePasswordSimple(password string) (string, bool) {
-	errMsg, ok := validateStringRequired(password, passwordFieldname)
+func ValidatePasswordSimple(password string, fieldname string) (string, bool) {
+	errMsg, ok := validateStringRequired(password, fieldname)
 	if !ok {
 		return errMsg, false
 	}
 
-	errMsg, ok = validateStringMinChars(password, passwordMinChars, passwordFieldname)
+	errMsg, ok = validateStringMinChars(password, passwordMinChars, fieldname)
 	if !ok {
 		return errMsg, false
 	}
 
-	errMsg, ok = validateStringMaxChars(password, passwordMaxChars, passwordFieldname)
+	errMsg, ok = validateStringMaxChars(password, passwordMaxChars, fieldname)
 	if !ok {
 		return errMsg, false
 	}
@@ -55,7 +55,7 @@ func ValidatePasswordSimple(password string) (string, bool) {
 }
 
 func ValidatePassword(password string) (string, bool) {
-	errMsg, ok := ValidatePasswordSimple(password)
+	errMsg, ok := ValidatePasswordSimple(password, passwordFieldname)
 	if !ok {
 		return errMsg, false
 	}
@@ -70,8 +70,12 @@ func ValidatePassword(password string) (string, bool) {
 	return "", true
 }
 
+const (
+	passwordConfirmFieldname = "password_confirm"
+)
+
 func ValidatePasswordConfirm(password string, passwordConfirm string) (string, bool) {
-	errMsg, ok := validateStringRequired(passwordConfirm, "password_confirm")
+	errMsg, ok := ValidatePasswordSimple(passwordConfirm, passwordConfirmFieldname)
 	if !ok {
 		return errMsg, false
 	}

@@ -9,6 +9,7 @@ import (
 	"github.com/werdna521/userland/repository/postgres"
 	"github.com/werdna521/userland/repository/redis"
 	"github.com/werdna521/userland/security"
+	"github.com/werdna521/userland/utils/slice"
 )
 
 type UserService interface {
@@ -17,17 +18,29 @@ type UserService interface {
 	GetCurrentEmail(ctx context.Context, userID string) (string, e.Error)
 	RequestEmailChange(ctx context.Context, userID string, newEmail string) e.Error
 	VerifyEmailChange(ctx context.Context, userID string, token string) e.Error
+	ChangePassword(
+		ctx context.Context,
+		userID string,
+		currentPassword string,
+		newPassword string,
+	) e.Error
 }
 
 type BaseUserService struct {
-	ur postgres.UserRepository
-	tr redis.TokenRepository
+	ur  postgres.UserRepository
+	phr postgres.PasswordHistoryRepository
+	tr  redis.TokenRepository
 }
 
-func NewBaseUserService(ur postgres.UserRepository, tr redis.TokenRepository) *BaseUserService {
+func NewBaseUserService(
+	ur postgres.UserRepository,
+	phr postgres.PasswordHistoryRepository,
+	tr redis.TokenRepository,
+) *BaseUserService {
 	return &BaseUserService{
-		ur: ur,
-		tr: tr,
+		ur:  ur,
+		phr: phr,
+		tr:  tr,
 	}
 }
 
@@ -165,6 +178,78 @@ func (s *BaseUserService) VerifyEmailChange(
 		log.Error().Err(err).Msg("failed to delete token from redis")
 		return e.NewInternalServerError()
 	}
+
+	return nil
+}
+
+func (s *BaseUserService) ChangePassword(
+	ctx context.Context,
+	userID string,
+	currentPassword string,
+	newPassword string,
+) e.Error {
+	log.Info().Msg("getting user from database")
+	u, err := s.ur.GetUserByID(ctx, userID)
+	if _, ok := err.(repository.NotFoundError); ok {
+		log.Error().Err(err).Msg("user not found")
+		return e.NewNotFoundError("user not found")
+	}
+	if err != nil {
+		log.Error().Err(err).Msg("failed to get user from the database")
+		return e.NewInternalServerError()
+	}
+
+	log.Info().Msg("checking current password")
+	err = security.CheckPassword(currentPassword, u.Password)
+	if err != nil {
+		log.Error().Err(err).Msg("wrong password")
+		return e.NewUnauthorizedError("wrong password")
+	}
+
+	log.Info().Msg("retrieving last 3 passwords")
+	hashes, err := s.phr.GetLastNPasswordHashes(ctx, userID, 3)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to retrieve last 3 passwords")
+		return e.NewInternalServerError()
+	}
+
+	log.Info().Msg("checking last 3 passwords")
+	if slice.AnyStr(hashes, func(h string) bool {
+		err := security.CheckPassword(newPassword, h)
+		return err == nil
+	}) {
+		log.Error().Msg("new password is the same as one of the last 3 passwords")
+		return e.NewBadRequestError("new password can't be the same as one of the last 3 passwords")
+	}
+
+	log.Info().Msg("hashing password")
+	hash, err := security.HashPassword(newPassword)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to hash password")
+		return e.NewInternalServerError()
+	}
+
+	log.Info().Msg("updating user password")
+	_, err = s.ur.UpdatePasswordByID(ctx, userID, hash)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to update user password")
+		return e.NewInternalServerError()
+	}
+
+	ph := &repository.PasswordHistory{
+		UserID:   u.ID,
+		Password: hash,
+	}
+
+	log.Info().Msg("creating password history record")
+	_, err = s.phr.CreatePasswordHistoryRecord(ctx, ph)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to create password history record")
+		return e.NewInternalServerError()
+	}
+
+	// TODO: not in the requirement, but it'll be nice to invalidate all other
+	// sessions after changing the password
 
 	return nil
 }

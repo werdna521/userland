@@ -104,7 +104,11 @@ func (s *Server) initServices() {
 
 	ss := service.NewBaseSessionService(s.repositories.sr)
 
-	us := service.NewBaseUserService(s.repositories.ur, s.repositories.tr)
+	us := service.NewBaseUserService(
+		s.repositories.ur,
+		s.repositories.phr,
+		s.repositories.tr,
+	)
 
 	s.services = &services{
 		as: as,
@@ -145,6 +149,12 @@ func (s *Server) initHandlers() http.Handler {
 
 				r.Get("/", user.GetCurrentEmailAddress(s.services.us))
 				r.Post("/", user.RequestEmailAddressChange(s.services.us))
+			})
+
+			r.Route("/password", func(r chi.Router) {
+				r.Use(middleware.ValidateAccessToken(s.repositories.sr))
+
+				r.Post("/", user.ChangePassword(s.services.us))
 			})
 
 			r.Route("/session", func(r chi.Router) {

@@ -62,7 +62,7 @@ func (r *BasePasswordHistoryRepository) PrepareStatements(ctx context.Context) e
 		`SELECT %s
 		 FROM %s
 		 WHERE %s = $1
-		 ORDER BY %s
+		 ORDER BY %s DESC
 		 LIMIT $2`,
 		passwordHistoryTablePasswordColName,
 		passwordHistoryTableName,
@@ -108,10 +108,6 @@ func (r *BasePasswordHistoryRepository) GetLastNPasswordHashes(
 ) ([]string, error) {
 	log.Info().Msg("running statement to get last n password hashes")
 	rows, err := r.statements.getLastNPasswordHashesStmt.QueryContext(ctx, userID, fmt.Sprint(n))
-	if err == sql.ErrNoRows {
-		log.Error().Err(err).Msg("no password history")
-		return nil, repository.NewNotFoundError()
-	}
 	if err != nil {
 		log.Error().Err(err).Msg("failed to get last n password hashes")
 		return nil, err

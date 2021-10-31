@@ -31,7 +31,7 @@ func validateLoginRequest(req *loginRequest) (map[string]string, bool) {
 		fields["email"] = errMsg
 	}
 
-	errMsg, ok = validator.ValidatePasswordSimple(req.Password)
+	errMsg, ok = validator.ValidatePasswordSimple(req.Password, "password")
 	if !ok {
 		fields["password"] = errMsg
 	}

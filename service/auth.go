@@ -283,7 +283,7 @@ func (s *BaseAuthService) ResetPassword(
 
 	log.Info().Msg("retrieving last 3 password hash from db")
 	hashes, err := s.phr.GetLastNPasswordHashes(ctx, userID, 3)
-	if _, ok := err.(repository.NotFoundError); !ok && err != nil {
+	if err != nil {
 		log.Error().Err(err).Msg("failed to get the password hashes")
 		return e.NewInternalServerError()
 	}
