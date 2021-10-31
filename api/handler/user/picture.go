@@ -66,3 +66,28 @@ func SetProfilePicture(us service.UserService) http.HandlerFunc {
 		}).JSON()
 	}
 }
+
+type deleteProfilePictureResponse struct {
+	Success bool `json:"success"`
+}
+
+func DeleteProfilePicture(us service.UserService) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		at, err := request.GetAccessTokenFromCtx(ctx)
+		if err != nil {
+			response.Error(w, err).JSON()
+			return
+		}
+
+		err = us.DeleteProfilePicture(ctx, at.UserID)
+		if err != nil {
+			response.Error(w, err).JSON()
+			return
+		}
+
+		response.OK(w, &deleteProfilePictureResponse{
+			Success: true,
+		}).JSON()
+	}
+}

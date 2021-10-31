@@ -163,6 +163,7 @@ func (s *Server) initHandlers() http.Handler {
 				r.Use(middleware.ValidateAccessToken(s.repositories.sr))
 
 				r.Post("/", user.SetProfilePicture(s.services.us))
+				r.Delete("/", user.DeleteProfilePicture(s.services.us))
 			})
 
 			r.Route("/session", func(r chi.Router) {

@@ -35,6 +35,7 @@ type UserService interface {
 		userID string,
 		file multipart.File,
 	) e.Error
+	DeleteProfilePicture(ctx context.Context, userID string) e.Error
 }
 
 type BaseUserService struct {
@@ -306,6 +307,7 @@ func (s *BaseUserService) SetProfilePicture(
 		log.Error().Err(err).Msg("failed to create a file")
 		return e.NewInternalServerError()
 	}
+	defer dst.Close()
 
 	log.Info().Msg("copying file")
 	if _, err := io.Copy(dst, file); err != nil {
@@ -317,6 +319,38 @@ func (s *BaseUserService) SetProfilePicture(
 	_, err = s.ur.UpdatePictureByID(ctx, userID, picturePath)
 	if err != nil {
 		log.Error().Err(err).Msg("failed to update picture path on database")
+		return e.NewInternalServerError()
+	}
+
+	return nil
+}
+
+func (s *BaseUserService) DeleteProfilePicture(
+	ctx context.Context,
+	userID string,
+) e.Error {
+	log.Info().Msg("getting picture path from database")
+	ub, err := s.ur.GetUserBioByID(ctx, userID)
+	if _, ok := err.(repository.NotFoundError); ok {
+		log.Error().Err(err).Msg("user not found")
+		return e.NewNotFoundError("user not found")
+	}
+	if err != nil {
+		log.Error().Err(err).Msg("failed to get user bio from database")
+		return e.NewInternalServerError()
+	}
+
+	log.Info().Msg("deleting picture from storage")
+	err = os.Remove(ub.Picture)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to delete picture from storage")
+		return e.NewInternalServerError()
+	}
+
+	log.Info().Msg("deleting picture path from database")
+	_, err = s.ur.UpdatePictureByID(ctx, userID, "")
+	if err != nil {
+		log.Error().Err(err).Msg("failed to delete picture path from database")
 		return e.NewInternalServerError()
 	}
 
