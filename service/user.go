@@ -2,6 +2,12 @@ package service
 
 import (
 	"context"
+	"fmt"
+	"image"
+	_ "image/png"
+	"io"
+	"mime/multipart"
+	"os"
 
 	"github.com/rs/zerolog/log"
 	e "github.com/werdna521/userland/api/error"
@@ -23,6 +29,11 @@ type UserService interface {
 		userID string,
 		currentPassword string,
 		newPassword string,
+	) e.Error
+	SetProfilePicture(
+		ctx context.Context,
+		userID string,
+		file multipart.File,
 	) e.Error
 }
 
@@ -250,6 +261,64 @@ func (s *BaseUserService) ChangePassword(
 
 	// TODO: not in the requirement, but it'll be nice to invalidate all other
 	// sessions after changing the password
+
+	return nil
+}
+
+const (
+	minWidthSize  = 200
+	minHeightSize = 200
+	maxWidthSize  = 500
+	maxHeightSize = 500
+)
+
+func (s *BaseUserService) SetProfilePicture(
+	ctx context.Context,
+	userID string,
+	file multipart.File,
+) e.Error {
+	log.Info().Msg("decoding image")
+	img, _, err := image.DecodeConfig(file)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to decode image")
+		return e.NewInternalServerError()
+	}
+
+	log.Info().Msg("checking image dimensions")
+	if img.Width < minWidthSize ||
+		img.Height < minHeightSize ||
+		img.Width > maxWidthSize ||
+		img.Height > maxHeightSize {
+		log.Error().Msg("image dimensions don't comply to the min and max sizes")
+		return e.NewBadRequestError("image should be at least 200x200 pixels and at most 500x500 pixels")
+	}
+
+	// set position back to start.
+	if _, err := file.Seek(0, io.SeekStart); err != nil {
+		return e.NewInternalServerError()
+	}
+
+	picturePath := fmt.Sprintf("uploaded/%s.png", string(security.GenerateRandomID()))
+
+	log.Info().Msg("creating a file")
+	dst, err := os.Create(picturePath)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to create a file")
+		return e.NewInternalServerError()
+	}
+
+	log.Info().Msg("copying file")
+	if _, err := io.Copy(dst, file); err != nil {
+		log.Error().Err(err).Msg("failed to copy file")
+		return e.NewInternalServerError()
+	}
+
+	log.Info().Msg("updating picture path on database")
+	_, err = s.ur.UpdatePictureByID(ctx, userID, picturePath)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to update picture path on database")
+		return e.NewInternalServerError()
+	}
 
 	return nil
 }

@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-redis/redis/v8"
@@ -157,6 +159,12 @@ func (s *Server) initHandlers() http.Handler {
 				r.Post("/", user.ChangePassword(s.services.us))
 			})
 
+			r.Route("/picture", func(r chi.Router) {
+				r.Use(middleware.ValidateAccessToken(s.repositories.sr))
+
+				r.Post("/", user.SetProfilePicture(s.services.us))
+			})
+
 			r.Route("/session", func(r chi.Router) {
 				r.Use(middleware.ValidateAccessToken(s.repositories.sr))
 
@@ -177,5 +185,19 @@ func (s *Server) initHandlers() http.Handler {
 		})
 	})
 
+	s.initFileServer(r)
+
 	return r
+}
+
+func (s *Server) initFileServer(r chi.Router) {
+	workDir, _ := os.Getwd()
+	// get the path to the static files directory
+	path := filepath.Join(workDir, "uploaded")
+
+	// create the directory if it doesn't exist
+	os.MkdirAll(path, os.ModePerm)
+
+	// create a file server for the static files
+	fileServer(r, "/uploaded", http.Dir(path))
 }

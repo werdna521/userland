@@ -60,6 +60,11 @@ type UserRepository interface {
 		userID string,
 		ub *repository.UserBio,
 	) (*repository.UserBio, error)
+	UpdatePictureByID(
+		ctx context.Context,
+		userID string,
+		picturePath string,
+	) (*repository.UserBio, error)
 }
 
 type BaseUserRepository struct {
@@ -77,6 +82,7 @@ type userStatements struct {
 	updatePasswordByIDStmt             *sql.Stmt
 	updateEmailByIDStmt                *sql.Stmt
 	updateUserBioByIDStmt              *sql.Stmt
+	updatePictureByIDStmt              *sql.Stmt
 }
 
 func NewBaseUserRepository(db *sql.DB) *BaseUserRepository {
@@ -288,6 +294,33 @@ func (r *BaseUserRepository) PrepareStatements(ctx context.Context) error {
 		return err
 	}
 
+	log.Info().Msg("preparing update picture by id statement")
+	query = fmt.Sprintf(
+		`UPDATE %s
+		 SET 
+		   %s = $1,
+			 %s = $2
+		 WHERE %s = $3
+		 RETURNING %s, %s, %s, %s, %s, %s, %s, %s`,
+		userBioTableName,
+		userBioTablePictureColName,
+		userBioTableUpdatedAtColName,
+		userBioTableUserIDColName,
+		userBioTableIDColName,
+		userBioTableFullNameColName,
+		userBioTableLocationColName,
+		userBioTableBioColName,
+		userBioTableWebColName,
+		userBioTablePictureColName,
+		userBioTableCreatedAtColName,
+		userBioTableUpdatedAtColName,
+	)
+	updatePictureByIDStmt, err := r.db.PrepareContext(ctx, query)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to prepare update picture by id statement")
+		return err
+	}
+
 	r.statements = &userStatements{
 		createUserStmt:                     createUserStmt,
 		createUserBioStmt:                  createUserBioStmt,
@@ -298,6 +331,7 @@ func (r *BaseUserRepository) PrepareStatements(ctx context.Context) error {
 		updatePasswordByIDStmt:             UpdatePasswordByIDStmt,
 		updateEmailByIDStmt:                updateEmailByIDStmt,
 		updateUserBioByIDStmt:              updateUserBioByIDStmt,
+		updatePictureByIDStmt:              updatePictureByIDStmt,
 	}
 
 	return nil
@@ -440,6 +474,21 @@ func (r *BaseUserRepository) UpdateUserBioByID(
 	log.Info().Msg("running statement to update user bio by id")
 	row := r.statements.updateUserBioByIDStmt.
 		QueryRowContext(ctx, ub.Fullname, ub.Location, ub.Bio, ub.Web, now, userID)
+	err := r.scanUserBio(ub, row)
+
+	return ub, err
+}
+
+func (r *BaseUserRepository) UpdatePictureByID(
+	ctx context.Context,
+	userID string,
+	picturePath string,
+) (*repository.UserBio, error) {
+	ub := &repository.UserBio{}
+	now := time.Now()
+
+	log.Info().Msg("running statement to update picture by id")
+	row := r.statements.updatePictureByIDStmt.QueryRowContext(ctx, picturePath, now, userID)
 	err := r.scanUserBio(ub, row)
 
 	return ub, err

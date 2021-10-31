@@ -40,6 +40,12 @@ func NewConflictError(msg string) client.ConflictError {
 	}
 }
 
+func NewRequestEntityTooLargeError(msg string) client.RequestEntityTooLargeError {
+	return client.RequestEntityTooLargeError{
+		Msg: msg,
+	}
+}
+
 func NewUnprocessableEntityError(fields map[string]string) client.UnprocessableEntityError {
 	return client.UnprocessableEntityError{
 		Fields: fields,
