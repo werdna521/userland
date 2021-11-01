@@ -44,6 +44,17 @@ func NewBaseAuthService(
 }
 
 func (s *BaseAuthService) Register(ctx context.Context, u *repository.User) e.Error {
+	log.Info().Msg("retrieving user from database")
+	_, err := s.ur.GetUserByEmail(ctx, u.Email)
+	if _, ok := err.(repository.NotFoundError); !ok && err != nil {
+		log.Error().Err(err).Msg("failed to retrieve user from database")
+		return e.NewInternalServerError()
+	}
+	if err == nil {
+		log.Info().Msg("user already exists")
+		return e.NewConflictError("user already exists")
+	}
+
 	log.Info().Msg("hashing password")
 	hash, err := security.HashPassword(u.Password)
 	if err != nil {
@@ -73,12 +84,18 @@ func (s *BaseAuthService) Register(ctx context.Context, u *repository.User) e.Er
 	log.Info().Msg("adding password to history")
 	s.phr.CreatePasswordHistoryRecord(ctx, ph)
 
-	log.Info().Msg("starting send verification email service")
-	err = s.SendEmailVerification(ctx, u.Email)
+	log.Info().Msg("generating verification token")
+	verificationToken := security.GenerateRandomID()
+
+	log.Info().Msg("storing email verification token")
+	err = s.tr.CreateEmailVerificationToken(ctx, u.ID, string(verificationToken))
 	if err != nil {
-		log.Error().Err(err).Msg("failed to send verification email")
-		return err.(e.Error)
+		log.Error().Err(err).Msg("failed to store email verification token")
+		return e.NewInternalServerError()
 	}
+
+	// TODO: send email with verification token/link
+	log.Debug().Msgf("verification token: %s", verificationToken)
 
 	return nil
 }

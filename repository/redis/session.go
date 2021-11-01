@@ -110,7 +110,6 @@ func (r *BaseSessionRepository) GetSession(
 
 	createdAt, err := time.Parse(time.RFC3339, res[hSessionCreatedAtKey])
 	if err != nil {
-		log.Debug().Msg(sessionID)
 		log.Error().Err(err).Msg("failed to parse created_at timestamp")
 		return nil, err
 	}

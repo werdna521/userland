@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"database/sql"
 	"time"
 )
 
@@ -12,6 +13,7 @@ type User struct {
 	UserBio   *UserBio
 	CreatedAt time.Time
 	UpdatedAt time.Time
+	DeletedAt sql.NullTime
 }
 
 type UserBio struct {

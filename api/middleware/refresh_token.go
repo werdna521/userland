@@ -68,6 +68,19 @@ func ValidateRefreshToken(sr redis.SessionRepository) middleware {
 				return
 			}
 
+			log.Info().Msg("checking session")
+			_, err = sr.GetSession(ctx, rt.UserID, rt.SessionID)
+			if _, ok := err.(repository.NotFoundError); ok {
+				log.Error().Msg("session does not exist")
+				response.Error(w, e.NewUnauthorizedError("invalid token")).JSON()
+				return
+			}
+			if err != nil {
+				log.Error().Err(err).Msg("failed to retrieve session from redis")
+				response.Error(w, e.NewInternalServerError()).JSON()
+				return
+			}
+
 			ctx = context.WithValue(r.Context(), RefreshTokenCtxKey, rt)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})

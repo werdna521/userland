@@ -36,23 +36,27 @@ type UserService interface {
 		file multipart.File,
 	) e.Error
 	DeleteProfilePicture(ctx context.Context, userID string) e.Error
+	DeleteAccount(ctx context.Context, userID string, password string) e.Error
 }
 
 type BaseUserService struct {
 	ur  postgres.UserRepository
 	phr postgres.PasswordHistoryRepository
 	tr  redis.TokenRepository
+	sr  redis.SessionRepository
 }
 
 func NewBaseUserService(
 	ur postgres.UserRepository,
 	phr postgres.PasswordHistoryRepository,
 	tr redis.TokenRepository,
+	sr redis.SessionRepository,
 ) *BaseUserService {
 	return &BaseUserService{
 		ur:  ur,
 		phr: phr,
 		tr:  tr,
+		sr:  sr,
 	}
 }
 
@@ -352,6 +356,85 @@ func (s *BaseUserService) DeleteProfilePicture(
 	if err != nil {
 		log.Error().Err(err).Msg("failed to delete picture path from database")
 		return e.NewInternalServerError()
+	}
+
+	return nil
+}
+
+func (s *BaseUserService) DeleteAccount(
+	ctx context.Context,
+	userID string,
+	password string,
+) e.Error {
+	log.Info().Msg("getting user from database")
+	u, err := s.ur.GetUserByID(ctx, userID)
+	if _, ok := err.(repository.NotFoundError); ok {
+		log.Error().Err(err).Msg("user not found")
+		return e.NewNotFoundError("user not found")
+	}
+	if err != nil {
+		log.Error().Err(err).Msg("failed to get user from database")
+		return e.NewInternalServerError()
+	}
+
+	log.Info().Msg("checking password")
+	err = security.CheckPassword(password, u.Password)
+	if err != nil {
+		log.Error().Err(err).Msg("password is wrong")
+		return e.NewBadRequestError("wrong password")
+	}
+
+	log.Info().Msg("deleting user from database")
+	err = s.ur.DeleteUserByID(ctx, userID)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to delete user from database")
+		return e.NewInternalServerError()
+	}
+
+	log.Info().Msg("getting all sessions")
+	sessions, err := s.sr.GetAllSessions(ctx, userID)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to get all sessions")
+		return e.NewInternalServerError()
+	}
+
+	log.Info().Msg("deleting all sessions")
+	for _, session := range sessions {
+		log.Info().Msg("removing session from redis")
+		err := s.sr.DeleteSession(ctx, session)
+		if err != nil {
+			log.Error().Err(err).Msg("failed to remove session from redis")
+			return e.NewInternalServerError()
+		}
+
+		accessToken := &repository.AccessToken{
+			UserID:    session.UserID,
+			SessionID: session.ID,
+		}
+		log.Info().Msg("revoking access token")
+		err = s.sr.DeleteAccessToken(ctx, accessToken)
+		if err != nil {
+			log.Error().Err(err).Msg("failed to revoke access token")
+			return e.NewInternalServerError()
+		}
+
+		refreshToken := &repository.RefreshToken{
+			UserID:    session.UserID,
+			SessionID: session.ID,
+		}
+		log.Info().Msg("revoking refresh token")
+		err = s.sr.DeleteRefreshToken(ctx, refreshToken)
+		if err != nil {
+			log.Error().Err(err).Msg("failed to revoke refresh token")
+			return e.NewInternalServerError()
+		}
+
+		log.Info().Msg("removing session id from index")
+		err = s.sr.RemoveUserSessionFromIndex(ctx, session.UserID, session.ID)
+		if err != nil {
+			log.Error().Err(err).Msg("failed to remove session id from index")
+			return e.NewInternalServerError()
+		}
 	}
 
 	return nil

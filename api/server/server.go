@@ -110,6 +110,7 @@ func (s *Server) initServices() {
 		s.repositories.ur,
 		s.repositories.phr,
 		s.repositories.tr,
+		s.repositories.sr,
 	)
 
 	s.services = &services{
@@ -164,6 +165,12 @@ func (s *Server) initHandlers() http.Handler {
 
 				r.Post("/", user.SetProfilePicture(s.services.us))
 				r.Delete("/", user.DeleteProfilePicture(s.services.us))
+			})
+
+			r.Route("/delete", func(r chi.Router) {
+				r.Use(middleware.ValidateAccessToken(s.repositories.sr))
+
+				r.Post("/", user.DeleteAccount(s.services.us))
 			})
 
 			r.Route("/session", func(r chi.Router) {

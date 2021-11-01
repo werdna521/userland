@@ -7,8 +7,6 @@ CREATE TABLE IF NOT EXISTS "user" (
   is_active BOOLEAN NOT NULL,
   created_at TIMESTAMP NOT NULL,
   updated_at TIMESTAMP NOT NULL,
-
-  CONSTRAINT user_email_unique UNIQUE(email)
 );
 CREATE INDEX IF NOT EXISTS user_id_idx ON "user"(id);
 CREATE INDEX IF NOT EXISTS user_email_idx ON "user"(email);

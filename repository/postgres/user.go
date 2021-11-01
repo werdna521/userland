@@ -20,6 +20,7 @@ const (
 	userTableIsActiveColName  = "is_active"
 	userTableCreatedAtColName = "created_at"
 	userTableUpdatedAtColName = "updated_at"
+	userTableDeletedAtColName = "deleted_at"
 
 	userBioTableName             = "user_bio"
 	userBioTableIDColName        = "id"
@@ -65,6 +66,7 @@ type UserRepository interface {
 		userID string,
 		picturePath string,
 	) (*repository.UserBio, error)
+	DeleteUserByID(ctx context.Context, userID string) error
 }
 
 type BaseUserRepository struct {
@@ -83,6 +85,7 @@ type userStatements struct {
 	updateEmailByIDStmt                *sql.Stmt
 	updateUserBioByIDStmt              *sql.Stmt
 	updatePictureByIDStmt              *sql.Stmt
+	deleteUserByIDStmt                 *sql.Stmt
 }
 
 func NewBaseUserRepository(db *sql.DB) *BaseUserRepository {
@@ -99,6 +102,7 @@ func (r *BaseUserRepository) scanUser(u *repository.User, row *sql.Row) error {
 		&u.IsActive,
 		&u.CreatedAt,
 		&u.UpdatedAt,
+		&u.DeletedAt,
 	)
 }
 
@@ -160,9 +164,10 @@ func (r *BaseUserRepository) PrepareStatements(ctx context.Context) error {
 	query = fmt.Sprintf(
 		`SELECT * 
 		 FROM %s
-		 WHERE %s = $1`,
+		 WHERE %s = $1 AND %s IS NULL`,
 		userTableName,
 		userTableEmailColName,
+		userTableDeletedAtColName,
 	)
 	getUserByEmailStmt, err := r.db.PrepareContext(ctx, query)
 	if err != nil {
@@ -198,12 +203,13 @@ func (r *BaseUserRepository) PrepareStatements(ctx context.Context) error {
 		 SET 
 		   %s = $1,
 			 %s = $2
-		 WHERE %s = $3
+		 WHERE %s = $3 AND %s IS NULL
 		 RETURNING *`,
 		userTableName,
 		userTableIsActiveColName,
 		userTableUpdatedAtColName,
 		userTableIDColName,
+		userTableDeletedAtColName,
 	)
 	updateUserActivationStatusByIDStmt, err := r.db.PrepareContext(ctx, query)
 	if err != nil {
@@ -217,12 +223,13 @@ func (r *BaseUserRepository) PrepareStatements(ctx context.Context) error {
 		 SET 
 		   %s = $1,
 			 %s = $2
-		 WHERE %s = $3
+		 WHERE %s = $3 AND %s IS NULL
 		 RETURNING *`,
 		userTableName,
 		userTablePasswordColName,
 		userTableUpdatedAtColName,
 		userTableIDColName,
+		userTableDeletedAtColName,
 	)
 	UpdatePasswordByIDStmt, err := r.db.PrepareContext(ctx, query)
 	if err != nil {
@@ -321,6 +328,21 @@ func (r *BaseUserRepository) PrepareStatements(ctx context.Context) error {
 		return err
 	}
 
+	log.Info().Msg("preparing delete user by id statement")
+	query = fmt.Sprintf(
+		`UPDATE %s
+		 SET %s = $1
+		 WHERE %s = $2`,
+		userTableName,
+		userTableDeletedAtColName,
+		userTableIDColName,
+	)
+	deleteUserByIDStmt, err := r.db.PrepareContext(ctx, query)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to prepare delete user by id statement")
+		return err
+	}
+
 	r.statements = &userStatements{
 		createUserStmt:                     createUserStmt,
 		createUserBioStmt:                  createUserBioStmt,
@@ -332,6 +354,7 @@ func (r *BaseUserRepository) PrepareStatements(ctx context.Context) error {
 		updateEmailByIDStmt:                updateEmailByIDStmt,
 		updateUserBioByIDStmt:              updateUserBioByIDStmt,
 		updatePictureByIDStmt:              updatePictureByIDStmt,
+		deleteUserByIDStmt:                 deleteUserByIDStmt,
 	}
 
 	return nil
@@ -492,4 +515,16 @@ func (r *BaseUserRepository) UpdatePictureByID(
 	err := r.scanUserBio(ub, row)
 
 	return ub, err
+}
+
+func (r *BaseUserRepository) DeleteUserByID(
+	ctx context.Context,
+	userID string,
+) error {
+	now := time.Now()
+
+	log.Info().Msg("running statement to soft delete user by id")
+	_, err := r.statements.deleteUserByIDStmt.ExecContext(ctx, now, userID)
+
+	return err
 }
