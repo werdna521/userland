@@ -19,7 +19,6 @@ const (
 
 type PasswordHistoryRepository interface {
 	PrepareStatements(context.Context) error
-	TearDownStatements()
 	CreatePasswordHistoryRecord(
 		ctx context.Context,
 		fp *repository.PasswordHistory,
@@ -81,10 +80,6 @@ func (r *BasePasswordHistoryRepository) PrepareStatements(ctx context.Context) e
 	}
 
 	return nil
-}
-
-func (r *BasePasswordHistoryRepository) TearDownStatements() {
-	defer r.statements.createPasswordHistoryRecordStmt.Close()
 }
 
 func (r *BasePasswordHistoryRepository) CreatePasswordHistoryRecord(

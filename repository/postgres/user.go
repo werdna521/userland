@@ -36,7 +36,6 @@ const (
 
 type UserRepository interface {
 	PrepareStatements(context.Context) error
-	TearDownStatements()
 	CreateUser(ctx context.Context, user *repository.User) (*repository.User, error)
 	GetUserByID(ctx context.Context, userID string) (*repository.User, error)
 	GetUserBioByID(ctx context.Context, userID string) (*repository.UserBio, error)
@@ -358,13 +357,6 @@ func (r *BaseUserRepository) PrepareStatements(ctx context.Context) error {
 	}
 
 	return nil
-}
-
-func (r *BaseUserRepository) TearDownStatements() {
-	defer r.statements.createUserStmt.Close()
-	defer r.statements.getUserByEmailStmt.Close()
-	defer r.statements.updateUserActivationStatusByIDStmt.Close()
-	defer r.statements.updatePasswordByIDStmt.Close()
 }
 
 func (r *BaseUserRepository) CreateUser(

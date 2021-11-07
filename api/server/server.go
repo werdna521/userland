@@ -59,7 +59,6 @@ func NewServer(config Config, dataSource *DataSource) *Server {
 func (s *Server) Start() {
 	log.Info().Msg("initializing repositories")
 	s.initRepositories()
-	defer s.tearDownRepositories()
 
 	log.Info().Msg("initializing services")
 	s.initServices()
@@ -89,11 +88,6 @@ func (s *Server) initRepositories() {
 		tr:  tr,
 		sr:  sr,
 	}
-}
-
-func (s *Server) tearDownRepositories() {
-	defer s.repositories.ur.TearDownStatements()
-	defer s.repositories.phr.TearDownStatements()
 }
 
 func (s *Server) initServices() {
