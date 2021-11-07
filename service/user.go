@@ -344,17 +344,17 @@ func (s *BaseUserService) DeleteProfilePicture(
 		return e.NewInternalServerError()
 	}
 
-	log.Info().Msg("deleting picture from storage")
-	err = os.Remove(ub.Picture)
-	if err != nil {
-		log.Error().Err(err).Msg("failed to delete picture from storage")
-		return e.NewInternalServerError()
-	}
-
 	log.Info().Msg("deleting picture path from database")
 	_, err = s.ur.UpdatePictureByID(ctx, userID, "")
 	if err != nil {
 		log.Error().Err(err).Msg("failed to delete picture path from database")
+		return e.NewInternalServerError()
+	}
+
+	log.Info().Msg("deleting picture from storage")
+	err = os.Remove(ub.Picture)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to delete picture from storage")
 		return e.NewInternalServerError()
 	}
 
