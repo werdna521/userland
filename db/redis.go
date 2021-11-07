@@ -29,7 +29,7 @@ func NewRedisConn(config RedisConfig) (*redis.Client, error) {
 
 func getRedisOptions(config RedisConfig) *redis.Options {
 	return &redis.Options{
-		Addr:     "redis:6379",
+		Addr:     config.Addr,
 		Password: config.Password,
 		DB:       config.DB,
 	}
