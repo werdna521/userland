@@ -21,6 +21,7 @@ services:
       - SENDINBLUE_SENDER_NAME=${SENDINBLUE_SENDER_NAME}
       - SENDINBLUE_SENDER_EMAIL=${SENDINBLUE_SENDER_EMAIL}
       - SENDINBLUE_API_KEY=${SENDINBLUE_API_KEY}
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
     ports:
       - ${API_PORT}:${API_PORT}
     depends_on:
@@ -28,6 +29,29 @@ services:
       - redis
       - adminer
       - migrate
+      - kafka
+      - log
+
+  log:
+    container_name: log
+    build:
+      context: ./log
+    restart: on-failure
+    volumes:
+      - ./log/:/app/log
+    env_file: .env
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_ADDR=postgres
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - KAFKA_GROUP_ID=log
+      - KAFKA_AUTO_OFFSET_RESET=earliest
+    depends_on:
+      - postgres
+      - migrate
+      - adminer
       - kafka
 
   postgres:
@@ -94,7 +118,7 @@ services:
     container_name: kafka-create-topics
     image: bitnami/kafka:latest
     restart: on-failure
-    entrypoint: kafka-topics.sh --create --topic ping --bootstrap-server kafka:9092 --partitions 1 --replication-factor 1
+    entrypoint: kafka-topics.sh --create --topic user_login --bootstrap-server kafka:9092 --partitions 1 --replication-factor 1
     environment:
       - KAFKA_CFG_ZOOKEEPER_CONNECT=zookeeper:2181
     depends_on:
