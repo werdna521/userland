@@ -15,5 +15,8 @@ git clone git@github.com/werdna521/userland.git
 3. Run the following command (make sure docker-compose is installed).
 
 ```bash
-docker-compose up
+npm run start
+
+# using npm-quick-run
+nr sta
 ```

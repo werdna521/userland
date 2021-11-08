@@ -1,7 +1,9 @@
 package main
 
 import (
+	"fmt"
 	"os"
+	"time"
 
 	"github.com/rs/zerolog/log"
 	"github.com/werdna521/userland/api/server"
@@ -10,6 +12,11 @@ import (
 )
 
 func main() {
+	ch := time.After(10 * time.Second)
+	fmt.Println("waiting")
+	<-ch
+	fmt.Println("waited")
+
 	serverConfig := server.Config{
 		Port: os.Getenv("API_PORT"),
 	}
@@ -34,14 +41,14 @@ func main() {
 	postgresConn, err := db.NewPosgresConn(postgresConfig)
 	if err != nil {
 		log.Error().Err(err).Stack().Msg("failed to connect to postgres")
-		return
+		panic("postgres failed")
 	}
 
 	log.Info().Msg("get connection to redis")
 	redisConn, err := db.NewRedisConn(redisConfig)
 	if err != nil {
 		log.Error().Err(err).Stack().Msg("failed to connect to redis")
-		return
+		panic("redis failed")
 	}
 
 	dataSource := &server.DataSource{

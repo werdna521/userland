@@ -1,0 +1,17 @@
+{
+  "name": "userland",
+  "version": "1.0.0",
+  "description": "Welcome to Userland 🎉",
+  "main": "index.js",
+  "scripts": {
+    "start": "docker-compose build && docker-compose up",
+    "stop": "docker-compose down && sudo rm -rf data",
+    "restart": "npm run stop && npm run start"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git@personal_github:werdna521/userland.git"
+  },
+  "author": "Andrew Cen",
+  "license": "ISC"
+}

@@ -3,11 +3,13 @@ package server
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
 
+	"github.com/confluentinc/confluent-kafka-go/kafka"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-redis/redis/v8"
 	"github.com/rs/zerolog/log"
@@ -70,6 +72,30 @@ func (s *Server) Start() {
 	h := s.initHandlers()
 	port := fmt.Sprintf(":%s", s.Port)
 
+	c, err := kafka.NewConsumer(&kafka.ConfigMap{
+		"bootstrap.servers": "kafka:9092",
+		"group.id":          "userland",
+		"auto.offset.reset": "earliest",
+	})
+	if err != nil {
+		log.Error().Err(err).Msg("failed to create kafka consumer")
+		panic("kafka consumer failed")
+	}
+
+	c.SubscribeTopics([]string{"ping"}, nil)
+
+	go func(c *kafka.Consumer) {
+		for {
+			msg, err := c.ReadMessage(-1)
+			if err != nil {
+				log.Error().Err(err).Msgf("consumer error: %v", err)
+				return
+			}
+			log.Info().Msgf("Message on %s: %s\n", msg.TopicPartition, string(msg.Value))
+		}
+	}(c)
+	defer c.Close()
+
 	log.Info().Msgf("server running on port %s", port)
 	http.ListenAndServe(port, h)
 }
@@ -121,6 +147,37 @@ func (s *Server) initServices() {
 
 func (s *Server) initHandlers() http.Handler {
 	r := chi.NewRouter()
+
+	r.Get("/ping", func(w http.ResponseWriter, r *http.Request) {
+		p, err := kafka.NewProducer(&kafka.ConfigMap{"bootstrap.servers": "kafka:9092"})
+		if err != nil {
+			log.Error().Err(err).Msg("failed to create kafka producer")
+			panic("kafka producer failed")
+		}
+		defer p.Close()
+
+		type Ping struct {
+			Message string `json:"message"`
+		}
+
+		ping := &Ping{
+			Message: "pong",
+		}
+		msg, _ := json.Marshal(ping)
+
+		topic := "ping"
+		p.Produce(&kafka.Message{
+			TopicPartition: kafka.TopicPartition{
+				Topic:     &topic,
+				Partition: kafka.PartitionAny,
+			},
+			Value: msg,
+		}, nil)
+
+		p.Flush(5000)
+
+		w.Write([]byte("pong"))
+	})
 
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Route("/auth", func(r chi.Router) {
