@@ -270,9 +270,10 @@ func (s *BaseAuthService) Login(
 
 	log.Info().Msg("storing session in redis")
 	session := &repository.Session{
-		ID:     at.SessionID,
-		Client: clientID,
-		UserID: at.UserID,
+		ID:        at.SessionID,
+		IPAddress: ip,
+		Client:    clientID,
+		UserID:    at.UserID,
 	}
 	err = s.sr.CreateSession(ctx, session, jwt.AccessTokenLife)
 	if err != nil {
