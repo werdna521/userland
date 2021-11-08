@@ -7,6 +7,7 @@ type Session struct {
 	ID        string
 	UserID    string
 	Client    string
+	IPAddress string
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }

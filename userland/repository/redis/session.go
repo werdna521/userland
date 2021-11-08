@@ -66,6 +66,7 @@ func (r *BaseSessionRepository) getRefreshTokenKey(rt *repository.RefreshToken) 
 func (r *BaseSessionRepository) toSessionFields(s *repository.Session) map[string]interface{} {
 	return map[string]interface{}{
 		hSessionClientKey:    s.Client,
+		hSessionIPAddress:    s.IPAddress,
 		hSessionCreatedAtKey: s.CreatedAt,
 		hSessionUpdatedAtKey: s.UpdatedAt,
 	}
@@ -124,6 +125,7 @@ func (r *BaseSessionRepository) GetSession(
 		ID:        sessionID,
 		UserID:    userID,
 		Client:    res[hSessionClientKey],
+		IPAddress: res[hSessionIPAddress],
 		CreatedAt: createdAt,
 		UpdatedAt: updatedAt,
 	}

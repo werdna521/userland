@@ -19,7 +19,12 @@ type AuthService interface {
 	Register(ctx context.Context, user *repository.User) e.Error
 	SendEmailVerification(ctx context.Context, email string) e.Error
 	VerifyEmail(ctx context.Context, email string, token string) e.Error
-	Login(ctx context.Context, user *repository.User, clientID string) (*jwt.AccessToken, e.Error)
+	Login(
+		ctx context.Context,
+		user *repository.User,
+		clientID string,
+		ip string,
+	) (*jwt.AccessToken, e.Error)
 	ForgotPassword(ctx context.Context, email string) e.Error
 	ResetPassword(ctx context.Context, token string, newPassword string) e.Error
 }
@@ -215,6 +220,7 @@ func (s *BaseAuthService) Login(
 	ctx context.Context,
 	u *repository.User,
 	clientID string,
+	ip string,
 ) (*jwt.AccessToken, e.Error) {
 	log.Info().Msg("retrieving user from database")
 	userFromDB, err := s.ur.GetUserByEmail(ctx, u.Email)

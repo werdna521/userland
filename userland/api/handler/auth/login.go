@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	e "github.com/werdna521/userland/api/error"
+	"github.com/werdna521/userland/api/request"
 	"github.com/werdna521/userland/api/response"
 	"github.com/werdna521/userland/api/validator"
 	"github.com/werdna521/userland/repository"
@@ -42,6 +43,7 @@ func validateLoginRequest(req *loginRequest) (map[string]string, bool) {
 func Login(as service.AuthService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		clientID := r.Header.Get("X-API-ClientID")
+		ip := request.ParseIPAddress(r)
 
 		req := &loginRequest{}
 		err := json.NewDecoder(r.Body).Decode(req)
@@ -61,7 +63,7 @@ func Login(as service.AuthService) http.HandlerFunc {
 			Email:    req.Email,
 			Password: req.Password,
 		}
-		at, err := as.Login(ctx, u, clientID)
+		at, err := as.Login(ctx, u, clientID, ip)
 		if err != nil {
 			response.Error(w, err.(e.Error)).JSON()
 			return

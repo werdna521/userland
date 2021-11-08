@@ -17,6 +17,7 @@ type listSessionsResponse struct {
 
 type userSession struct {
 	IsCurrent bool      `json:"isCurrent"`
+	IPAddress string    `json:"ip"`
 	Client    *client   `json:"client"`
 	CreatedAt time.Time `json:"createdAt"`
 	UpdatedAt time.Time `json:"updatedAt"`
@@ -27,7 +28,6 @@ type client struct {
 	Name string `json:"name"`
 }
 
-// TODO: maybe store IP address in session (only if enough time)
 func ListSessions(ss service.SessionService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -47,6 +47,7 @@ func ListSessions(ss service.SessionService) http.HandlerFunc {
 		for _, s := range sessions {
 			us := &userSession{
 				IsCurrent: s.ID == at.SessionID,
+				IPAddress: s.IPAddress,
 				Client: &client{
 					ID:   s.ID,
 					Name: s.Client,

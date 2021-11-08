@@ -17,6 +17,7 @@ const (
 	refreshTokenKey = "refreshtoken"
 
 	hSessionClientKey    = "client"
+	hSessionIPAddress    = "ip"
 	hSessionCreatedAtKey = "created_at"
 	hSessionUpdatedAtKey = "updated_at"
 )
