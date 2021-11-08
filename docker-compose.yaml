@@ -3,10 +3,11 @@ version: '3'
 services:
   api:
     container_name: api
-    build: .
+    build:
+      context: ./userland
     restart: on-failure
     volumes:
-      - ./:/app/api
+      - ./userland/:/app/api
     env_file: .env
     environment:
       - API_PORT=${API_PORT}
@@ -28,6 +29,7 @@ services:
       - adminer
       - migrate
       - kafka
+
   postgres:
     container_name: postgres
     image: postgres:alpine
@@ -39,6 +41,7 @@ services:
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_DB=${POSTGRES_DB}
+
   redis:
     container_name: redis
     image: redis:alpine
@@ -46,12 +49,14 @@ services:
     volumes:
       - ./data/redis:/data
     env_file: .env
+
   adminer:
     container_name: adminer
     image: adminer:standalone
     restart: on-failure
     ports:
       - 8080:8080
+
   migrate:
     image: migrate/migrate
     restart: on-failure
@@ -67,12 +72,14 @@ services:
       ]
     depends_on:
       - postgres
+
   zookeeper:
     container_name: zookeeper
     image: bitnami/zookeeper:latest
     restart: on-failure
     environment:
       - ALLOW_ANONYMOUS_LOGIN=yes
+
   kafka:
     container_name: kafka
     image: bitnami/kafka:latest
@@ -82,6 +89,7 @@ services:
       - KAFKA_CFG_ZOOKEEPER_CONNECT=zookeeper:2181
     depends_on:
       - zookeeper
+
   kafka-create-topics:
     container_name: kafka-create-topics
     image: bitnami/kafka:latest

@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "start": "docker-compose build && docker-compose up",
-    "stop": "docker-compose down && sudo rm -rf data",
+    "stop": "docker-compose down && sudo rm -rf data uploaded",
     "restart": "npm run stop && npm run start"
   },
   "repository": {

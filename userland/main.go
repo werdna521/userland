@@ -12,9 +12,10 @@ import (
 )
 
 func main() {
-	ch := time.After(10 * time.Second)
+	// docker won't restart on failure if program is not running for at least 10
+	// seconds
 	fmt.Println("waiting")
-	<-ch
+	<-time.After(10 * time.Second)
 	fmt.Println("waited")
 
 	serverConfig := server.Config{
