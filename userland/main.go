@@ -8,7 +8,11 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/werdna521/userland/api/server"
 	"github.com/werdna521/userland/db"
+<<<<<<< HEAD
 	"github.com/werdna521/userland/mailer"
+=======
+	"github.com/werdna521/userland/producer"
+>>>>>>> 3080e41 (feat: send message through user_login topic)
 )
 
 func main() {
@@ -36,20 +40,29 @@ func main() {
 		SenderName:  os.Getenv("SENDINBLUE_SENDER_NAME"),
 		SenderEmail: os.Getenv("SENDINBLUE_SENDER_EMAIL"),
 		APIKey:      os.Getenv("SENDINBLUE_API_KEY"),
+	producerConfig := producer.ProducerConfig{
+		BootstrapServers: os.Getenv("KAFKA_BOOTSTRAP_SERVERS"),
 	}
 
 	log.Info().Msg("get connection to postgres")
 	postgresConn, err := db.NewPosgresConn(postgresConfig)
 	if err != nil {
-		log.Error().Err(err).Stack().Msg("failed to connect to postgres")
-		panic("postgres failed")
+		log.Error().Err(err).Msg("failed to connect to postgres")
+		panic("failed to connect to postgres")
 	}
 
 	log.Info().Msg("get connection to redis")
 	redisConn, err := db.NewRedisConn(redisConfig)
 	if err != nil {
-		log.Error().Err(err).Stack().Msg("failed to connect to redis")
-		panic("redis failed")
+		log.Error().Err(err).Msg("failed to connect to redis")
+		panic("failed to connect to redis")
+	}
+
+	log.Info().Msg("creating a kafka producer")
+	p, err := producer.NewKafkaProducer(producerConfig)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to create a kafka producer")
+		panic("failed to create a kafka producer")
 	}
 
 	dataSource := &server.DataSource{
@@ -60,6 +73,6 @@ func main() {
 	mailer := mailer.NewBaseMailer(mailerConfig)
 
 	log.Info().Msg("starting api server")
-	server := server.NewServer(serverConfig, mailer, dataSource)
+	server := server.NewServer(serverConfig, mailer, dataSource, p)
 	server.Start()
 }

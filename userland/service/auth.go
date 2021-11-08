@@ -7,6 +7,7 @@ import (
 	"github.com/rs/zerolog/log"
 	e "github.com/werdna521/userland/api/error"
 	"github.com/werdna521/userland/mailer"
+	"github.com/werdna521/userland/producer"
 	"github.com/werdna521/userland/repository"
 	"github.com/werdna521/userland/repository/postgres"
 	"github.com/werdna521/userland/repository/redis"
@@ -35,6 +36,7 @@ type BaseAuthService struct {
 	tr  redis.TokenRepository
 	sr  redis.SessionRepository
 	m   mailer.Mailer
+	lp  producer.LogProducer
 }
 
 func NewBaseAuthService(
@@ -43,6 +45,7 @@ func NewBaseAuthService(
 	tr redis.TokenRepository,
 	sr redis.SessionRepository,
 	m mailer.Mailer,
+	lp producer.LogProducer,
 ) *BaseAuthService {
 	return &BaseAuthService{
 		ur:  ur,
@@ -50,6 +53,7 @@ func NewBaseAuthService(
 		tr:  tr,
 		sr:  sr,
 		m:   m,
+		lp:  lp,
 	}
 }
 
@@ -285,6 +289,17 @@ func (s *BaseAuthService) Login(
 	err = s.sr.AddUserSessionToIndex(ctx, session)
 	if err != nil {
 		log.Error().Err(err).Msg("failed to add the session id to the index set")
+		return nil, e.NewInternalServerError()
+	}
+
+	log.Info().Msg("producing message to log micro")
+	ll := &producer.LoginLog{
+		UserID:   userFromDB.ID,
+		RemoteIP: ip,
+	}
+	err = s.lp.ProduceLoginTopic(ll)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to produce message to log micro")
 		return nil, e.NewInternalServerError()
 	}
 

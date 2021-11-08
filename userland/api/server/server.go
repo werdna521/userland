@@ -3,7 +3,6 @@ package server
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
@@ -18,6 +17,7 @@ import (
 	"github.com/werdna521/userland/api/handler/user"
 	"github.com/werdna521/userland/api/middleware"
 	"github.com/werdna521/userland/mailer"
+	"github.com/werdna521/userland/producer"
 	"github.com/werdna521/userland/repository/postgres"
 	rds "github.com/werdna521/userland/repository/redis"
 	"github.com/werdna521/userland/service"
@@ -29,6 +29,12 @@ type Server struct {
 	DataSource   *DataSource
 	repositories *repositories
 	services     *services
+	kp           *kafka.Producer
+	producers    *producers
+}
+
+type producers struct {
+	lp producer.LogProducer
 }
 
 type repositories struct {
@@ -53,15 +59,24 @@ type DataSource struct {
 	Redis    *redis.Client
 }
 
-func NewServer(config Config, mailer mailer.Mailer, dataSource *DataSource) *Server {
+func NewServer(
+	config Config,
+	mailer mailer.Mailer,
+	dataSource *DataSource,
+	kp *kafka.Producer,
+) *Server {
 	return &Server{
 		Config:     config,
 		mailer:     mailer,
 		DataSource: dataSource,
+		kp:         kp,
 	}
 }
 
 func (s *Server) Start() {
+	log.Info().Msg("initializing producers")
+	s.initProducers()
+
 	log.Info().Msg("initializing repositories")
 	s.initRepositories()
 
@@ -72,32 +87,16 @@ func (s *Server) Start() {
 	h := s.initHandlers()
 	port := fmt.Sprintf(":%s", s.Port)
 
-	c, err := kafka.NewConsumer(&kafka.ConfigMap{
-		"bootstrap.servers": "kafka:9092",
-		"group.id":          "userland",
-		"auto.offset.reset": "earliest",
-	})
-	if err != nil {
-		log.Error().Err(err).Msg("failed to create kafka consumer")
-		panic("kafka consumer failed")
-	}
-
-	c.SubscribeTopics([]string{"ping"}, nil)
-
-	go func(c *kafka.Consumer) {
-		for {
-			msg, err := c.ReadMessage(-1)
-			if err != nil {
-				log.Error().Err(err).Msgf("consumer error: %v", err)
-				return
-			}
-			log.Info().Msgf("Message on %s: %s\n", msg.TopicPartition, string(msg.Value))
-		}
-	}(c)
-	defer c.Close()
-
 	log.Info().Msgf("server running on port %s", port)
 	http.ListenAndServe(port, h)
+}
+
+func (s *Server) initProducers() {
+	lp := producer.NewBaseLogProducer(s.kp)
+
+	s.producers = &producers{
+		lp: lp,
+	}
 }
 
 func (s *Server) initRepositories() {
@@ -126,6 +125,7 @@ func (s *Server) initServices() {
 		s.repositories.tr,
 		s.repositories.sr,
 		s.mailer,
+		s.producers.lp,
 	)
 
 	ss := service.NewBaseSessionService(s.repositories.sr)
@@ -147,37 +147,6 @@ func (s *Server) initServices() {
 
 func (s *Server) initHandlers() http.Handler {
 	r := chi.NewRouter()
-
-	r.Get("/ping", func(w http.ResponseWriter, r *http.Request) {
-		p, err := kafka.NewProducer(&kafka.ConfigMap{"bootstrap.servers": "kafka:9092"})
-		if err != nil {
-			log.Error().Err(err).Msg("failed to create kafka producer")
-			panic("kafka producer failed")
-		}
-		defer p.Close()
-
-		type Ping struct {
-			Message string `json:"message"`
-		}
-
-		ping := &Ping{
-			Message: "pong",
-		}
-		msg, _ := json.Marshal(ping)
-
-		topic := "ping"
-		p.Produce(&kafka.Message{
-			TopicPartition: kafka.TopicPartition{
-				Topic:     &topic,
-				Partition: kafka.PartitionAny,
-			},
-			Value: msg,
-		}, nil)
-
-		p.Flush(5000)
-
-		w.Write([]byte("pong"))
-	})
 
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Route("/auth", func(r chi.Router) {
