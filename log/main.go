@@ -8,6 +8,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/werdna521/userland/log/consumer"
 	"github.com/werdna521/userland/log/core"
+	"github.com/werdna521/userland/log/db"
 )
 
 func main() {
@@ -22,6 +23,12 @@ func main() {
 		GroupID:          os.Getenv("KAFKA_GROUP_ID"),
 		AutoOffsetReset:  os.Getenv("KAFKA_AUTO_OFFSET_RESET"),
 	}
+	postgresConfig := db.PostgresConfig{
+		Username: os.Getenv("POSTGRES_USER"),
+		Password: os.Getenv("POSTGRES_PASSWORD"),
+		Addr:     os.Getenv("POSTGRES_ADDR"),
+		Database: os.Getenv("POSTGRES_DB"),
+	}
 
 	c, err := consumer.NewKafkaConsumer(consumerConfig)
 	if err != nil {
@@ -29,6 +36,16 @@ func main() {
 		panic("kafka consumer failed")
 	}
 
-	logMicro := core.NewBaseLogMicro(c)
+	postgresConn, err := db.NewPosgresConn(postgresConfig)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to create postgres connection")
+		panic("postgres connection failed")
+	}
+
+	d := core.Datasource{
+		Postgres: postgresConn,
+	}
+
+	logMicro := core.NewBaseLogMicro(c, d)
 	logMicro.InitLogService()
 }
