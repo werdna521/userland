@@ -6,6 +6,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/werdna521/userland/api/server"
 	"github.com/werdna521/userland/db"
+	"github.com/werdna521/userland/mailer"
 )
 
 func main() {
@@ -22,6 +23,11 @@ func main() {
 		Addr:     os.Getenv("REDIS_ADDR"),
 		Password: os.Getenv("REDIS_PASSWORD"),
 		DB:       0,
+	}
+	mailerConfig := mailer.Config{
+		SenderName:  os.Getenv("SENDINBLUE_SENDER_NAME"),
+		SenderEmail: os.Getenv("SENDINBLUE_SENDER_EMAIL"),
+		APIKey:      os.Getenv("SENDINBLUE_API_KEY"),
 	}
 
 	log.Info().Msg("get connection to postgres")
@@ -43,7 +49,9 @@ func main() {
 		Redis:    redisConn,
 	}
 
+	mailer := mailer.NewBaseMailer(mailerConfig)
+
 	log.Info().Msg("starting api server")
-	server := server.NewServer(serverConfig, dataSource)
+	server := server.NewServer(serverConfig, mailer, dataSource)
 	server.Start()
 }

@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS "user" (
   password TEXT NOT NULL,
   is_active BOOLEAN NOT NULL,
   created_at TIMESTAMP NOT NULL,
-  updated_at TIMESTAMP NOT NULL,
+  updated_at TIMESTAMP NOT NULL
 );
 CREATE INDEX IF NOT EXISTS user_id_idx ON "user"(id);
 CREATE INDEX IF NOT EXISTS user_email_idx ON "user"(email);

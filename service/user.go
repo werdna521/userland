@@ -11,6 +11,7 @@ import (
 
 	"github.com/rs/zerolog/log"
 	e "github.com/werdna521/userland/api/error"
+	"github.com/werdna521/userland/mailer"
 	"github.com/werdna521/userland/repository"
 	"github.com/werdna521/userland/repository/postgres"
 	"github.com/werdna521/userland/repository/redis"
@@ -44,6 +45,7 @@ type BaseUserService struct {
 	phr postgres.PasswordHistoryRepository
 	tr  redis.TokenRepository
 	sr  redis.SessionRepository
+	m   mailer.Mailer
 }
 
 func NewBaseUserService(
@@ -51,12 +53,14 @@ func NewBaseUserService(
 	phr postgres.PasswordHistoryRepository,
 	tr redis.TokenRepository,
 	sr redis.SessionRepository,
+	m mailer.Mailer,
 ) *BaseUserService {
 	return &BaseUserService{
 		ur:  ur,
 		phr: phr,
 		tr:  tr,
 		sr:  sr,
+		m:   m,
 	}
 }
 
@@ -153,8 +157,23 @@ func (s *BaseUserService) RequestEmailChange(
 		return e.NewInternalServerError()
 	}
 
-	// TODO: send the verification link to the new email
-	log.Debug().Msgf("email change token: %s", token)
+	verificationLink := fmt.Sprintf(
+		"http://localhost:3000/api/v1/me/email/verification?id=%s&token=%s",
+		u.ID,
+		token,
+	)
+
+	log.Debug().Msgf("verification link: %s", verificationLink)
+	log.Info().Msg("sending verification link")
+	em := mailer.Email{
+		Name:  newEmail,
+		Email: newEmail,
+	}
+	err = mailer.SendEmailVerificationMail(ctx, s.m, em, verificationLink)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to send verification link")
+		return e.NewInternalServerError()
+	}
 
 	return nil
 }

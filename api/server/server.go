@@ -15,6 +15,7 @@ import (
 	"github.com/werdna521/userland/api/handler/session"
 	"github.com/werdna521/userland/api/handler/user"
 	"github.com/werdna521/userland/api/middleware"
+	"github.com/werdna521/userland/mailer"
 	"github.com/werdna521/userland/repository/postgres"
 	rds "github.com/werdna521/userland/repository/redis"
 	"github.com/werdna521/userland/service"
@@ -22,6 +23,7 @@ import (
 
 type Server struct {
 	Config
+	mailer       mailer.Mailer
 	DataSource   *DataSource
 	repositories *repositories
 	services     *services
@@ -49,9 +51,10 @@ type DataSource struct {
 	Redis    *redis.Client
 }
 
-func NewServer(config Config, dataSource *DataSource) *Server {
+func NewServer(config Config, mailer mailer.Mailer, dataSource *DataSource) *Server {
 	return &Server{
 		Config:     config,
+		mailer:     mailer,
 		DataSource: dataSource,
 	}
 }
@@ -96,6 +99,7 @@ func (s *Server) initServices() {
 		s.repositories.phr,
 		s.repositories.tr,
 		s.repositories.sr,
+		s.mailer,
 	)
 
 	ss := service.NewBaseSessionService(s.repositories.sr)
@@ -105,6 +109,7 @@ func (s *Server) initServices() {
 		s.repositories.phr,
 		s.repositories.tr,
 		s.repositories.sr,
+		s.mailer,
 	)
 
 	s.services = &services{

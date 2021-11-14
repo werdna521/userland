@@ -2,9 +2,11 @@ package service
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/rs/zerolog/log"
 	e "github.com/werdna521/userland/api/error"
+	"github.com/werdna521/userland/mailer"
 	"github.com/werdna521/userland/repository"
 	"github.com/werdna521/userland/repository/postgres"
 	"github.com/werdna521/userland/repository/redis"
@@ -27,6 +29,7 @@ type BaseAuthService struct {
 	phr postgres.PasswordHistoryRepository
 	tr  redis.TokenRepository
 	sr  redis.SessionRepository
+	m   mailer.Mailer
 }
 
 func NewBaseAuthService(
@@ -34,12 +37,14 @@ func NewBaseAuthService(
 	phr postgres.PasswordHistoryRepository,
 	tr redis.TokenRepository,
 	sr redis.SessionRepository,
+	m mailer.Mailer,
 ) *BaseAuthService {
 	return &BaseAuthService{
 		ur:  ur,
 		phr: phr,
 		tr:  tr,
 		sr:  sr,
+		m:   m,
 	}
 }
 
@@ -94,8 +99,23 @@ func (s *BaseAuthService) Register(ctx context.Context, u *repository.User) e.Er
 		return e.NewInternalServerError()
 	}
 
-	// TODO: send email with verification token/link
-	log.Debug().Msgf("verification token: %s", verificationToken)
+	verificationLink := fmt.Sprintf(
+		"http://localhost:3000/api/v1/auth/verification?id=%s&token=%s",
+		u.ID,
+		verificationToken,
+	)
+
+	log.Debug().Msgf("verification link: %s", verificationLink)
+	log.Info().Msg("sending verification link")
+	email := mailer.Email{
+		Name:  u.UserBio.Fullname,
+		Email: u.Email,
+	}
+	err = mailer.SendEmailVerificationMail(ctx, s.m, email, verificationLink)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to send verification link")
+		return e.NewInternalServerError()
+	}
 
 	return nil
 }
@@ -130,8 +150,23 @@ func (s *BaseAuthService) SendEmailVerification(
 		return e.NewInternalServerError()
 	}
 
-	// TODO: send email with verification token/link
-	log.Debug().Msgf("verification token: %s", verificationToken)
+	verificationLink := fmt.Sprintf(
+		"http://localhost:3000/api/v1/me/email/verification?id=%s&token=%s",
+		u.ID,
+		verificationToken,
+	)
+
+	log.Debug().Msgf("verification link: %s", verificationLink)
+	log.Info().Msg("sending verification link")
+	em := mailer.Email{
+		Name:  u.Email,
+		Email: u.Email,
+	}
+	err = mailer.SendEmailVerificationMail(ctx, s.m, em, verificationLink)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to send verification link")
+		return e.NewInternalServerError()
+	}
 
 	return nil
 }
@@ -277,8 +312,17 @@ func (s *BaseAuthService) ForgotPassword(ctx context.Context, email string) e.Er
 		return e.NewInternalServerError()
 	}
 
-	// TODO: send email with verification token/link
-	log.Debug().Msgf("forgot password token: %s", token)
+	log.Debug().Msgf("token: %s", token)
+	log.Info().Msg("sending password reset mail")
+	em := mailer.Email{
+		Name:  email,
+		Email: email,
+	}
+	err = mailer.SendPasswordResetMail(ctx, s.m, em, string(token))
+	if err != nil {
+		log.Error().Err(err).Msg("failed to send password reset mail")
+		return e.NewInternalServerError()
+	}
 
 	return nil
 }
