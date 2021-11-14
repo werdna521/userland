@@ -8,11 +8,8 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/werdna521/userland/api/server"
 	"github.com/werdna521/userland/db"
-<<<<<<< HEAD
 	"github.com/werdna521/userland/mailer"
-=======
 	"github.com/werdna521/userland/producer"
->>>>>>> 3080e41 (feat: send message through user_login topic)
 )
 
 func main() {
@@ -40,6 +37,7 @@ func main() {
 		SenderName:  os.Getenv("SENDINBLUE_SENDER_NAME"),
 		SenderEmail: os.Getenv("SENDINBLUE_SENDER_EMAIL"),
 		APIKey:      os.Getenv("SENDINBLUE_API_KEY"),
+	}
 	producerConfig := producer.ProducerConfig{
 		BootstrapServers: os.Getenv("KAFKA_BOOTSTRAP_SERVERS"),
 	}
