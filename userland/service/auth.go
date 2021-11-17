@@ -160,7 +160,7 @@ func (s *BaseAuthService) SendEmailVerification(
 	}
 
 	verificationLink := fmt.Sprintf(
-		"http://localhost:3000/api/v1/me/email/verification?id=%s&token=%s",
+		"http://localhost:3000/api/v1/auth/verification?id=%s&token=%s",
 		u.ID,
 		verificationToken,
 	)
