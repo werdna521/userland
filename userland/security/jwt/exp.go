@@ -3,7 +3,6 @@ package jwt
 import "time"
 
 const (
-	AccessTokenLife = 5 * time.Minute
-	// TODO: make expiration longer, current duration is just for debugging purposes
-	RefreshTokenLife = 10 * time.Minute
+	AccessTokenLife  = 1 * time.Hour
+	RefreshTokenLife = 24 * time.Hour
 )
